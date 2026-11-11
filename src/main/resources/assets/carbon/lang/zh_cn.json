@@ -1,0 +1,15 @@
+{
+  "carbon.configuration.title": "%s 配置",
+  "carbon.configuration.section.carbon.client.toml": "客户端设置",
+  "carbon.configuration.enabled": "启用 Carbon",
+  "carbon.configuration.enabled.tooltip": "GPU 物品渲染优化总开关。关闭后交还原有渲染流程。",
+  "carbon.configuration.optimizeDroppedItems": "GPU 接管掉落物",
+  "carbon.configuration.optimizeDroppedItems.tooltip": "默认开启。使用专用 GPU 管线处理普通掉落物模型、自旋和缩放；关闭后保留其他模组的变换，标准模型提交仍可实例化。",
+  "carbon.configuration.physicalDroppedItems": "物理旋转视觉效果",
+  "carbon.configuration.physicalDroppedItems.tooltip": "默认关闭，需要启用 GPU 接管掉落物。按 ItemPhysicLite 的局部旋转轴翻滚，落地后平滑躺平，并以固定微小高度偏移减轻重叠闪烁。仅改变视觉，不修改速度、碰撞或拾取。",
+  "carbon.configuration.skipVisibilityChecks": "缓存掉落物可见性",
+  "carbon.configuration.skipVisibilityChecks.tooltip": "在固定视角下复用可见的掉落物批次。视角变化时重新筛选，实体筛选模组可接管可见性判断。关闭时每帧沿用游戏的实体筛选。",
+  "carbon.configuration.cacheUpdateBudgetMs": "缓存更新预算（毫秒）",
+  "carbon.configuration.cacheUpdateBudgetMs.tooltip": "每帧默认 2 毫秒，可设为 0–20 毫秒。过期的掉落物缓存排队分帧更新，完成前继续绘制上一份场景。0 表示立即更新。单个物品的更新可能超出预算。",
+  "carbon.configuration.section.carbon.client.toml.title": "客户端设置"
+}

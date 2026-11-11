@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "carbon",
+  "version": "${version}",
+  "name": "Carbon",
+  "description": "GPU instancing for item rendering. Unofficial Minecraft 1.18.2 Fabric port.",
+  "authors": ["First_sight"],
+  "license": "MIT",
+  "icon": "assets/carbon/icon.png",
+  "environment": "client",
+  "entrypoints": { "client": ["first.carbon.Carbon"] },
+  "mixins": ["carbon.mixins.json"],
+  "accessWidener": "carbon.accesswidener",
+  "depends": { "fabricloader": ">=0.16.5", "minecraft": "1.18.2", "java": ">=17", "fabric": "*" },
+  "contact": { "sources": "https://github.com/wwwzzzxxx/Carbon-Fabric" }
+}

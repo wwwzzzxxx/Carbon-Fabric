@@ -1,0 +1,37 @@
+plugins { id 'net.fabricmc.fabric-loom-remap' }
+version = '1.20.6.9-fabric.7'
+group = 'first.carbon'
+base { archivesName = 'carbon' }
+repositories { mavenCentral(); maven { url='https://api.modrinth.com/maven' } }
+loom { accessWidenerPath = file('../../src/main/resources/carbon.accesswidener') }
+dependencies {
+    minecraft 'com.mojang:minecraft:1.20.6'
+    mappings loom.officialMojangMappings()
+    modImplementation 'net.fabricmc:fabric-loader:0.19.5'
+    modImplementation 'net.fabricmc.fabric-api:fabric-api:0.100.8+1.20.6'
+    implementation 'org.joml:joml:1.10.8'
+    include 'org.joml:joml:1.10.8'
+    modCompileOnly 'maven.modrinth:iris:1.7.2+1.20.6'
+}
+def generated = layout.buildDirectory.dir('generated/carbon')
+tasks.register('prepareVersionSources', Exec) {
+    inputs.dir '../../src/main'
+    inputs.dir 'overrides'
+    inputs.file 'patches.json'
+    inputs.file '../../tools/prepare_version.py'
+    outputs.dir generated
+    commandLine 'python', '-X', 'utf8', '../../tools/prepare_version.py', project.projectDir.absolutePath, generated.get().asFile.absolutePath
+}
+sourceSets.main.java.setSrcDirs([generated.map { it.dir('java') }])
+sourceSets.main.resources.setSrcDirs([generated.map { it.dir('resources') }])
+java { withSourcesJar(); sourceCompatibility = JavaVersion.VERSION_21; targetCompatibility = JavaVersion.VERSION_21 }
+tasks.named('compileJava') { dependsOn 'prepareVersionSources' }
+tasks.named('processResources') { dependsOn 'prepareVersionSources' }
+tasks.named('sourcesJar') { dependsOn 'prepareVersionSources' }
+tasks.withType(JavaCompile).configureEach { options.release = 21; options.encoding = 'UTF-8' }
+tasks.withType(ProcessResources).configureEach {
+    filteringCharset = 'UTF-8'
+    inputs.property 'version', project.version
+    filesMatching('fabric.mod.json') { expand(version: project.version) }
+}
+tasks.withType(Jar).configureEach { from '../../LICENSE' }

@@ -1,0 +1,31 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "first.carbon.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "client": [
+    "ItemRendererMixin",
+    "ItemStackFoilMixin",
+    "BufferBuilderMixin",
+    "BufferSourceMixin",
+    "VertexMultiConsumerMixin",
+    "LevelRendererMixin",
+    "EntityRenderDispatcherMixin",
+    "ClientChunkCacheMixin",
+    "ClientLevelMixin",
+    "EntitySceneMixin",
+    "ItemEntityCacheMixin",
+    "ItemEntityRendererMixin",
+    "ItemStackSceneMixin",
+    "MinecraftMixin",
+    "SpriteAccessor",
+    "WindowMixin",
+    "RenderTypeStateAccessor",
+    "ItemRenderStateMixin",
+    "JpegTextureCompatMixin",
+    "ImageReadLimitMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

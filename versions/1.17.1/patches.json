@@ -1,0 +1,92 @@
+[
+  {
+    "file": "resources/fabric.mod.json",
+    "old": "\"mixins\": [\"carbon.mixins.json\"]",
+    "new": "\"mixins\": [\"carbon.mixins.json\", \"carbon.iris1171.mixins.json\"]",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/ItemBatchRenderer.java",
+    "old": "import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;",
+    "new": "import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;\nimport it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/ItemBatchRenderer.java",
+    "old": "private final Reference2ObjectOpenHashMap<RenderType, Reference2ObjectOpenHashMap<GpuItemBatch, Submission>> layers = new Reference2ObjectOpenHashMap<>();",
+    "new": "private final Object2ObjectOpenHashMap<RenderType, Reference2ObjectOpenHashMap<GpuItemBatch, Submission>> layers = new Object2ObjectOpenHashMap<>();",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/DroppedItemBatchRenderer.java",
+    "old": "import org.slf4j.LoggerFactory;",
+    "new": "import org.apache.logging.log4j.LogManager;",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/DroppedItemBatchRenderer.java",
+    "old": "import org.slf4j.Logger;",
+    "new": "import org.apache.logging.log4j.Logger;",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/DroppedItemBatchRenderer.java",
+    "old": "LoggerFactory.getLogger",
+    "new": "LogManager.getLogger",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/DroppedItemBatchRenderer.java",
+    "old": "RenderSystem.getShaderFogShape().getIndex()",
+    "new": "0",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/GpuShadowBatch.java",
+    "old": "RenderSystem.getShaderFogShape().getIndex()",
+    "new": "0",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/ItemBatchRenderer.java",
+    "old": "import org.slf4j.LoggerFactory;",
+    "new": "import org.apache.logging.log4j.LogManager;",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/ItemBatchRenderer.java",
+    "old": "import org.slf4j.Logger;",
+    "new": "import org.apache.logging.log4j.Logger;",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/ItemBatchRenderer.java",
+    "old": "LoggerFactory.getLogger",
+    "new": "LogManager.getLogger",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/ItemBatchRenderer.java",
+    "old": "RenderSystem.getShaderFogShape().getIndex()",
+    "new": "0",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/compat/ItemEntityCompatibility.java",
+    "old": "import org.slf4j.LoggerFactory;",
+    "new": "import org.apache.logging.log4j.LogManager;",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/compat/ItemEntityCompatibility.java",
+    "old": "LoggerFactory.getLogger",
+    "new": "LogManager.getLogger",
+    "count": 2
+  },
+  {
+    "file": "java/first/carbon/compat/EntityCullingCompatibility.java",
+    "old": "\n                && (minecraft.level.isOutsideBuildHeight(item.blockPosition().getY())\n                    || minecraft.levelRenderer.isChunkCompiled(item.blockPosition()))",
+    "new": "",
+    "count": 1
+  }
+]

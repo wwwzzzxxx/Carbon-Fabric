@@ -1,0 +1,32 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "first.carbon.mixin",
+  "plugin": "first.carbon.mixin.LegacyMixinPlugin",
+  "compatibilityLevel": "JAVA_8",
+  "client": [
+    "ItemRendererMixin",
+    "BufferBuilderMixin",
+    "BufferSourceMixin",
+    "IrisBufferedSourceMixin",
+    "VertexMultiConsumerMixin",
+    "BufferBuilderAccessor",
+    "SpriteAccessor",
+    "MinecraftMixin",
+    "LevelRendererMixin",
+    "OptiFineLevelRendererMixin",
+    "ItemEntityRendererMixin",
+    "EntityRenderDispatcherMixin",
+    "ItemPickupParticleMixin",
+    "ClientLevelSceneMixin",
+    "ClientChunkCacheMixin",
+    "EntitySceneMixin",
+    "WindowMixin",
+    "Matrix3Accessor",
+    "Matrix4Accessor",
+    "QuadAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

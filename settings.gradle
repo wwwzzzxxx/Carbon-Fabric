@@ -1,0 +1,14 @@
+pluginManagement {
+    repositories { mavenCentral(); gradlePluginPortal(); maven { url = 'https://maven.fabricmc.net/' } }
+}
+rootProject.name = 'carbon-fabric-1182'
+def requestedVersions = gradle.startParameter.taskNames.findAll {
+    it.startsWith(':mc') || it.startsWith('mc')
+}.collect { it.replaceFirst('^:', '').split(':')[0].substring(2) }.toSet()
+def includeAll = gradle.startParameter.taskNames.empty || gradle.startParameter.projectProperties.containsKey('allVersions')
+file('versions').listFiles().findAll { it.isDirectory() && new File(it, 'build.gradle').isFile() }.sort { it.name }.each { directory ->
+    if (includeAll || requestedVersions.contains(directory.name)) {
+        include('mc' + directory.name)
+        project(':mc' + directory.name).projectDir = directory
+    }
+}

@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "carbon",
+  "version": "${version}",
+  "name": "Carbon",
+  "description": "GPU item model batching for Minecraft 1.16.5 Fabric. Legacy renderer backend.",
+  "authors": [
+    "First_sight"
+  ],
+  "license": "MIT",
+  "icon": "assets/carbon/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "first.carbon.Carbon"
+    ]
+  },
+  "mixins": [
+    "carbon.legacy.mixins.json"
+  ],
+  "accessWidener": "carbon.legacy.accesswidener",
+  "depends": {
+    "fabricloader": ">=0.14.25",
+    "minecraft": "1.16.5",
+    "java": ">=8",
+    "fabric": "*"
+  },
+  "contact": {
+    "sources": "https://github.com/wwwzzzxxx/Carbon-Fabric"
+  }
+}

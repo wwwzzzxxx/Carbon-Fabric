@@ -1,0 +1,18 @@
+accessWidener v2 official
+accessible field net/minecraft/client/renderer/item/CuboidItemModelWrapper tints Ljava/util/List;
+accessible field net/minecraft/client/renderer/item/CuboidItemModelWrapper extents Ljava/util/function/Supplier;
+
+accessible field net/minecraft/client/renderer/item/ItemStackRenderState activeLayerCount I
+accessible field net/minecraft/client/renderer/item/ItemStackRenderState layers [Lnet/minecraft/client/renderer/item/ItemStackRenderState$LayerRenderState;
+accessible field net/minecraft/client/renderer/item/ItemStackRenderState$LayerRenderState foilType Lnet/minecraft/client/renderer/item/ItemStackRenderState$FoilType;
+accessible field net/minecraft/client/renderer/item/ItemStackRenderState$LayerRenderState specialRenderer Lnet/minecraft/client/renderer/special/SpecialModelRenderer;
+accessible field net/minecraft/client/renderer/item/ItemStackRenderState$LayerRenderState quads Lnet/minecraft/client/resources/model/geometry/ItemQuads;
+accessible field net/minecraft/client/renderer/rendertype/RenderType state Lnet/minecraft/client/renderer/rendertype/RenderSetup;
+accessible field net/minecraft/client/renderer/rendertype/RenderSetup textureTransform Lnet/minecraft/client/renderer/rendertype/TextureTransform;
+accessible field net/minecraft/client/renderer/rendertype/RenderSetup layeringTransform Lnet/minecraft/client/renderer/rendertype/LayeringTransform;
+accessible field net/minecraft/client/renderer/item/ItemStackRenderState$LayerRenderState tintLayers Lit/unimi/dsi/fastutil/ints/IntList;
+accessible field net/minecraft/client/renderer/item/ItemStackRenderState$LayerRenderState itemTransform Lnet/minecraft/client/resources/model/cuboid/ItemTransform;
+accessible field net/minecraft/client/renderer/item/ItemStackRenderState$LayerRenderState localTransform Lorg/joml/Matrix4f;
+accessible field net/minecraft/client/renderer/item/ItemStackRenderState$LayerRenderState extents Ljava/util/function/Supplier;
+
+accessible field net/minecraft/client/renderer/rendertype/RenderSetup useOverlay Z

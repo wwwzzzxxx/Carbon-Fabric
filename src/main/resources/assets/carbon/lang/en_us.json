@@ -1,0 +1,15 @@
+{
+  "carbon.configuration.title": "%s Configuration",
+  "carbon.configuration.section.carbon.client.toml": "Client Settings",
+  "carbon.configuration.enabled": "Enable Carbon",
+  "carbon.configuration.enabled.tooltip": "Enable GPU item rendering optimizations. Disable to restore the original rendering path.",
+  "carbon.configuration.optimizeDroppedItems": "GPU Dropped-item Pipeline",
+  "carbon.configuration.optimizeDroppedItems.tooltip": "Enabled by default. Handle ordinary dropped-item geometry, spin and scale on the GPU. Disable to preserve other mods' transforms while allowing standard model submissions to be instanced.",
+  "carbon.configuration.physicalDroppedItems": "Visual Item Physics",
+  "carbon.configuration.physicalDroppedItems.tooltip": "Disabled by default; requires the GPU dropped-item pipeline. Tumble around ItemPhysicLite's local axis, settle smoothly after landing, and use a fixed tiny height offset to reduce overlapping surface flicker. Does not change velocity, collisions or pickup.",
+  "carbon.configuration.skipVisibilityChecks": "Cache Item Visibility",
+  "carbon.configuration.skipVisibilityChecks.tooltip": "Reuse visible item batches while the view is stationary. Changes to the view rebuild the selection, and entity visibility mods can keep control of selection. Disable to use the game's entity selection every frame.",
+  "carbon.configuration.cacheUpdateBudgetMs": "Cache Update Budget (ms)",
+  "carbon.configuration.cacheUpdateBudgetMs.tooltip": "Default 2 ms per frame, configurable from 0 to 20 ms. Queue expired dropped-item caches and keep drawing the previous scene until updates finish. 0 updates immediately. Individual item updates can exceed the budget.",
+  "carbon.configuration.section.carbon.client.toml.title": "Client Settings"
+}

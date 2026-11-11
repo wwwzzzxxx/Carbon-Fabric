@@ -1,0 +1,8 @@
+[
+  {
+    "file": "java/first/carbon/mixin/ItemLimitExtractionMixin.java",
+    "old": "@WrapOperation(method = \"renderLevel\",",
+    "new": "@WrapOperation(method = \"extractLevel\",",
+    "count": 1
+  }
+]

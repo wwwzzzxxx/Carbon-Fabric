@@ -1,0 +1,296 @@
+[
+  {
+    "file": "java/first/carbon/client/DroppedItemBatchRenderer.java",
+    "old": "net.minecraft.client.renderer.block.model.ItemTransforms.TransformType",
+    "new": "net.minecraft.world.item.ItemDisplayContext",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/DroppedItemBatchRenderer.java",
+    "old": "TransformType",
+    "new": "ItemDisplayContext",
+    "count": 3
+  },
+  {
+    "file": "java/first/carbon/client/GpuDroppedItemBatch.java",
+    "old": "net.minecraft.client.renderer.block.model.ItemTransforms.TransformType",
+    "new": "net.minecraft.world.item.ItemDisplayContext",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/GpuDroppedItemBatch.java",
+    "old": "TransformType",
+    "new": "ItemDisplayContext",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/GpuDroppedItemBatch.java",
+    "old": "Random random = new Random(42)",
+    "new": "net.minecraft.util.RandomSource random = net.minecraft.util.RandomSource.create(42)",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/GpuDroppedItemBatch.java",
+    "old": "((first.carbon.mixin.SpriteAccessor) sprite)",
+    "new": "((first.carbon.mixin.SpriteAccessor) (Object) sprite.contents())",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/GpuItemBatch.java",
+    "old": "Random random = new Random(42)",
+    "new": "net.minecraft.util.RandomSource random = net.minecraft.util.RandomSource.create(42)",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/GpuItemBatch.java",
+    "old": "((first.carbon.mixin.SpriteAccessor) sprite)",
+    "new": "((first.carbon.mixin.SpriteAccessor) (Object) sprite.contents())",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/ItemBatchRenderer.java",
+    "old": "pose.pose().store(",
+    "new": "pose.pose().get(",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/ItemBatchRenderer.java",
+    "old": "pose.normal().store(",
+    "new": "pose.normal().get(",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/mixin/LevelRendererMixin.java",
+    "old": "com.mojang.math.Matrix4f",
+    "new": "org.joml.Matrix4f",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/ItemConfigScreen.java",
+    "old": "new Button(width / 2 - 100, height - 40, 200, 20, CommonComponents.GUI_DONE, button -> onClose())",
+    "new": "Button.builder(CommonComponents.GUI_DONE, button -> onClose()).bounds(width / 2 - 100, height - 40, 200, 20).build()",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/ClientEvents.java",
+    "old": "import net.minecraft.network.chat.TextComponent;",
+    "new": "import net.minecraft.network.chat.Component;",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/ClientEvents.java",
+    "old": "new TextComponent(",
+    "new": "Component.literal(",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/DroppedItemBatchRenderer.java",
+    "old": "options.entityShadows",
+    "new": "options.entityShadows().get()",
+    "count": 2
+  },
+  {
+    "file": "java/first/carbon/client/DroppedItemBatchRenderer.java",
+    "old": "options.renderDistance",
+    "new": "options.renderDistance().get()",
+    "count": 2
+  },
+  {
+    "file": "java/first/carbon/client/DroppedItemBatchRenderer.java",
+    "old": "options.entityDistanceScaling",
+    "new": "options.entityDistanceScaling().get()",
+    "count": 2
+  },
+  {
+    "file": "java/first/carbon/client/DroppedItemBatchRenderer.java",
+    "old": "new com.mojang.math.Quaternion(rotation.x, rotation.y, rotation.z, rotation.w)",
+    "new": "rotation",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/GpuShadowBatch.java",
+    "old": "level.dimensionType().brightness(brightness)",
+    "new": "net.minecraft.client.renderer.LightTexture.getBrightness(level.dimensionType(), brightness)",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/ItemConfigScreen.java",
+    "old": "new net.minecraft.network.chat.TranslatableComponent(",
+    "new": "net.minecraft.network.chat.Component.translatable(",
+    "count": 4
+  },
+  {
+    "file": "java/first/carbon/mixin/EntityRenderDispatcherMixin.java",
+    "old": "options.entityShadows",
+    "new": "options.entityShadows().get()",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/compat/IrisLayer.java",
+    "old": "    @Override public TransparencyType getTransparencyType()",
+    "new": "    @Override public void setTransparencyType(TransparencyType type) { ((BlendingStateHolder) (Object) wrapped).setTransparencyType(type); }\n    @Override public TransparencyType getTransparencyType()",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/ItemConfigScreen.java",
+    "old": "com.mojang.blaze3d.vertex.PoseStack",
+    "new": "net.minecraft.client.gui.GuiGraphics",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/ItemConfigScreen.java",
+    "old": "render(PoseStack graphics",
+    "new": "render(GuiGraphics graphics",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/ItemConfigScreen.java",
+    "old": "drawCenteredString(graphics, font, title, width / 2, 30, 0xFFFFFF)",
+    "new": "graphics.drawCenteredString(font, title, width / 2, 30, 0xFFFFFF)",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/compat/IrisLayer.java",
+    "old": "end(BufferBuilder builder, int x, int y, int z)",
+    "new": "end(BufferBuilder builder, com.mojang.blaze3d.vertex.VertexSorting sorting)",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/compat/IrisLayer.java",
+    "old": "wrapped.end(builder, x, y, z)",
+    "new": "wrapped.end(builder, sorting)",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/DroppedItemBatchRenderer.java",
+    "old": "entity.level == level",
+    "new": "entity.level() == level",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/DroppedItemBatchRenderer.java",
+    "old": "entity.isOnGround()",
+    "new": "entity.onGround()",
+    "count": 2
+  },
+  {
+    "file": "java/first/carbon/compat/EntityCullingCompatibility.java",
+    "old": "item.level == minecraft.level",
+    "new": "item.level() == minecraft.level",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/GpuShadowBatch.java",
+    "old": "var level = entity.level;",
+    "new": "var level = entity.level();",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/compat/IrisCompatibility.java",
+    "old": "return !active || !blocked && GL.getCapabilities().OpenGL43;",
+    "new": "return !present || !blocked && (!active || GL.getCapabilities().OpenGL43);",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/DroppedItemBatchRenderer.java",
+    "old": "glUniform1f(glGetUniformLocation(drawProgram, \"GlintAlpha\"), 1.0f);",
+    "new": "glUniform1f(glGetUniformLocation(drawProgram, \"GlintAlpha\"), RenderSystem.getShaderGlintAlpha());",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/ItemBatchRenderer.java",
+    "old": "glUniform1f(uniforms[14], 1.0f);",
+    "new": "glUniform1f(uniforms[14], RenderSystem.getShaderGlintAlpha());",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/ItemConfigScreen.java",
+    "old": "        renderBackground(graphics);\n",
+    "new": "",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/compat/EntityCullingCompatibility.java",
+    "old": "isChunkCompiled(item.blockPosition())",
+    "new": "isSectionCompiled(item.blockPosition())",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/compat/IrisCompatibility.java",
+    "old": "net.coderbot.iris.",
+    "new": "net.irisshaders.iris.",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/compat/IrisCompatibility.java",
+    "old": "pipeline.newshader.ShaderKey",
+    "new": "pipeline.programs.ShaderKey",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/compat/IrisLayer.java",
+    "old": "net.coderbot.batchedentityrendering",
+    "new": "net.irisshaders.batchedentityrendering",
+    "count": 2
+  },
+  {
+    "file": "java/first/carbon/compat/IrisCompatibility.java",
+    "old": "block_rendering.BlockRenderingSettings",
+    "new": "shaderpack.materialmap.WorldRenderingSettings",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/compat/IrisCompatibility.java",
+    "old": "private boolean checked, present, active, blocked;",
+    "new": "private boolean checked, present, active, blocked, bridgeReady;",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/compat/IrisCompatibility.java",
+    "old": ".newInstance(\"minecraft\", \"item\");",
+    "new": ".newInstance(\"minecraft\", \"item\");\n                bridgeReady = true;",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/compat/IrisCompatibility.java",
+    "old": "        blocked = false;",
+    "new": "        blocked = present && !bridgeReady;",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/mixin/ItemRendererMixin.java",
+    "old": "    @Inject(method = \"renderModelLists\", at = @At(\"HEAD\"), cancellable = true)\n    private void imo$submit(BakedModel model, ItemStack stack, int light, int overlay, PoseStack pose, VertexConsumer vertices, CallbackInfo ci) {\n        if (Carbon.Client.RENDERER.submit(model, stack, light, overlay, pose, vertices)) {\n            ci.cancel();\n        }\n    }",
+    "new": "",
+    "count": 1
+  },
+  {
+    "file": "resources/carbon.mixins.json",
+    "old": "\"ItemRendererMixin\",",
+    "new": "\"ItemRendererMixin\",\n    \"ItemModelSubmissionMixin\",",
+    "count": 1
+  },
+  {
+    "file": "resources/carbon.mixins.json",
+    "old": "\"BufferBuilderMixin\",",
+    "new": "\"BufferBuilderMixin\",\n    \"SodiumBufferBuilderMixin\",",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/compat/IrisCompatibility.java",
+    "old": "        return source.getBuffer(type);\n    }\n\n    public RenderType unwrap",
+    "new": "        VertexConsumer result = source.getBuffer(type);\n        if (result instanceof ItemBatchRenderer.Target target && source instanceof MultiBufferSource.BufferSource owner) target.imo$target(owner, type);\n        return result;\n    }\n\n    public RenderType unwrap",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/compat/IrisCompatibility.java",
+    "old": "                    if (name.equals(\"net.irisshaders.iris.layer.BufferSourceWrapper\")) {\n                        original = (MultiBufferSource) original.getClass().getMethod(\"getOriginal\").invoke(original);\n                    } else if (original.getClass().isSynthetic()\n                            && name.startsWith(net.minecraft.client.renderer.entity.EntityRenderDispatcher.class.getName() + \"$$Lambda\")) {",
+    "new": "                    if (name.equals(namespace + \"layer.BufferSourceWrapper\")\n                            || name.equals(\"net.irisshaders.iris.layer.BufferSourceWrapper\")\n                            || original.getClass().isSynthetic()\n                            && name.startsWith(net.minecraft.client.renderer.entity.EntityRenderDispatcher.class.getName() + \"$$Lambda\")) {",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/GpuShadowBatch.java",
+    "old": "                glBindVertexArray(vao);",
+    "new": "                glUniform1f(glGetUniformLocation(program, \"ShadowHeightFactor\"), first.carbon.compat.RenderCompat.shadowHeightFactor());\n                glBindVertexArray(vao);",
+    "count": 1
+  }
+]

@@ -1,0 +1,9 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "first.carbon.compat.iris1171.mixin",
+  "plugin": "first.carbon.compat.Iris1171MixinPlugin",
+  "compatibilityLevel": "JAVA_16",
+  "client": ["IrisBufferedSourceMixin", "IrisWrappedLayerMixin"],
+  "injectors": {"defaultRequire": 1}
+}

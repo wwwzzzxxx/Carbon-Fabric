@@ -1,0 +1,10 @@
+accessWidener v2 named
+accessible field net/minecraft/client/renderer/LevelRenderer capturedFrustum Lnet/minecraft/client/renderer/culling/Frustum;
+accessible field net/minecraft/client/renderer/entity/EntityRenderDispatcher shouldRenderShadow Z
+accessible field net/minecraft/client/renderer/entity/EntityRenderDispatcher SHADOW_RENDER_TYPE Lnet/minecraft/client/renderer/RenderType;
+accessible field net/minecraft/client/renderer/entity/EntityRenderer shadowRadius F
+accessible field net/minecraft/client/renderer/entity/EntityRenderer shadowStrength F
+accessible method net/minecraft/client/renderer/entity/EntityRenderDispatcher renderShadow (Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;Lnet/minecraft/world/entity/Entity;FFLnet/minecraft/world/level/LevelReader;F)V
+accessible field net/minecraft/client/renderer/block/model/ItemOverrides overrides Ljava/util/List;
+accessible field net/minecraft/client/renderer/block/model/ItemOverride predicates Ljava/util/Map;
+accessible method net/minecraft/client/renderer/entity/ItemRenderer renderModelLists (Lnet/minecraft/client/resources/model/BakedModel;Lnet/minecraft/world/item/ItemStack;IILcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;)V

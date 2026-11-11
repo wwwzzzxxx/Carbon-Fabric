@@ -1,0 +1,18 @@
+accessWidener v2 named
+accessible field net/minecraft/client/renderer/LevelRenderer cullingFrustum Lnet/minecraft/client/renderer/culling/Frustum;
+accessible field net/minecraft/client/renderer/culling/Frustum matrix Lorg/joml/Matrix4f;
+accessible method net/minecraft/client/renderer/culling/Frustum cubeInFrustum (DDDDDD)I
+
+accessible field net/minecraft/client/renderer/item/ItemStackRenderState activeLayerCount I
+accessible field net/minecraft/client/renderer/item/ItemStackRenderState layers [Lnet/minecraft/client/renderer/item/ItemStackRenderState$LayerRenderState;
+accessible field net/minecraft/client/renderer/item/ItemStackRenderState$LayerRenderState renderType Lnet/minecraft/client/renderer/RenderType;
+accessible field net/minecraft/client/renderer/item/ItemStackRenderState$LayerRenderState tintLayers [I
+accessible field net/minecraft/client/renderer/item/ItemStackRenderState$LayerRenderState foilType Lnet/minecraft/client/renderer/item/ItemStackRenderState$FoilType;
+accessible field net/minecraft/client/renderer/item/ItemStackRenderState$LayerRenderState specialRenderer Lnet/minecraft/client/renderer/special/SpecialModelRenderer;
+accessible method net/minecraft/client/renderer/entity/ItemRenderer renderQuadList (Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;Ljava/util/List;[III)V
+accessible field net/minecraft/client/renderer/item/ItemStackRenderState$LayerRenderState quads Ljava/util/List;
+accessible field net/minecraft/client/renderer/item/ItemStackRenderState$LayerRenderState transform Lnet/minecraft/client/renderer/block/model/ItemTransform;
+accessible field net/minecraft/client/renderer/item/ItemStackRenderState$LayerRenderState extents Ljava/util/function/Supplier;
+accessible field net/minecraft/client/renderer/item/BlockModelWrapper extents Ljava/util/function/Supplier;
+accessible field net/minecraft/client/renderer/item/BlockModelWrapper tints Ljava/util/List;
+accessible field net/minecraft/client/renderer/item/BlockModelWrapper quads Ljava/util/List;
