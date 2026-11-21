@@ -670,5 +670,77 @@
     "old": "        if (!stack.isDamageableItem()) return false;\n        BakedModel model = minecraft.getItemRenderer().getItemModelShaper().getItemModel(stack);\n        return durabilityModels.computeIfAbsent(model, base -> {\n            var overrides = base.getOverrides();\n            if (overrides.getClass() != net.minecraft.client.renderer.block.model.ItemOverrides.class) return false;\n            for (var property : overrides.properties) {\n                if (!property.getNamespace().equals(\"minecraft\")\n                        || !(property.getPath().equals(\"damage\") || property.getPath().equals(\"damaged\"))) return false;\n            }\n            return true;\n        });",
     "new": "        return false;",
     "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/ItemBatchRenderer.java",
+    "old": "    private final BufferedDropPoses retainedDrops = BufferedDropProvider.provider().isEmpty()\n            ? null : new BufferedDropPoses(this::replayExternalDrop, this::poseOwner);\n    private final Logger logger = LoggerFactory.getLogger(\"Carbon\");\n",
+    "new": "    private final BufferedDropPoses retainedDrops = BufferedDropProvider.provider().isEmpty()\n            ? null : new BufferedDropPoses(this::replayExternalDrop);\n    private final Logger logger = LoggerFactory.getLogger(\"Carbon\");\n",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/ItemBatchRenderer.java",
+    "old": "    private boolean replayExternalDrop(BufferedDropPoses.Entry entry, MultiBufferSource buffers) {\n        MultiBufferSource owner = poseOwner(buffers);\n        if (owner == null || !(Carbon.Client.IRIS.getBuffer(buffers, Carbon.Client.IRIS.unwrap(entry.layer)) instanceof Target target)\n                || target.imo$source() != owner || target.imo$type() != entry.layer) return false;\n        Submission draw = submission(target, entry.batch);\n",
+    "new": "    private boolean replayExternalDrop(BufferedDropPoses.Entry entry, MultiBufferSource buffers) {\n        if (!(Carbon.Client.IRIS.getBuffer(buffers, entry.layer) instanceof Target target)\n                || target.imo$source() != buffers || target.imo$type() != entry.layer) return false;\n        Submission draw = submission(target, entry.batch);\n",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/ItemBatchRenderer.java",
+    "old": "        return true;\n    }\n\n    private MultiBufferSource poseOwner(MultiBufferSource buffers) {\n        Class<?> type = buffers.getClass();\n        if (type == MultiBufferSource.BufferSource.class) return buffers;\n        if (Carbon.Client.IRIS.active() || !Carbon.Client.IRIS.canInstance()) return null;\n        String name = type.getName();\n        return (name.equals(\"net.coderbot.batchedentityrendering.impl.FullyBufferedMultiBufferSource\")\n                || name.equals(\"net.irisshaders.batchedentityrendering.impl.FullyBufferedMultiBufferSource\"))\n                ? buffers : null;\n    }\n",
+    "new": "        return true;\n    }\n",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/BufferedDropPoses.java",
+    "old": "import java.util.WeakHashMap;\nimport java.util.function.Function;\n\n",
+    "new": "import java.util.WeakHashMap;\n\n",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/BufferedDropPoses.java",
+    "old": "    private final Replay replay;\n    private final Function<MultiBufferSource, MultiBufferSource> owner;\n    private Entry collecting;\n",
+    "new": "    private final Replay replay;\n    private Entry collecting;\n",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/BufferedDropPoses.java",
+    "old": "    BufferedDropPoses(Replay replay) {\n        this(replay, source -> source.getClass() == MultiBufferSource.BufferSource.class ? source : null);\n    }\n\n    BufferedDropPoses(Replay replay, Function<MultiBufferSource, MultiBufferSource> owner) {\n        this.replay = replay;\n        this.owner = owner;\n    }\n",
+    "new": "    BufferedDropPoses(Replay replay) {\n        this.replay = replay;\n    }\n",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/BufferedDropPoses.java",
+    "old": "                       Object shape, Object surroundings, int style, float pitch, float yaw, Runnable original) {\n        MultiBufferSource captureOwner = owner.apply(buffers);\n        if (collecting != null || captureOwner == null) {\n            // If another model render occurs inside the capture, keep its original dispatch.\n",
+    "new": "                       Object shape, Object surroundings, int style, float pitch, float yaw, Runnable original) {\n        if (collecting != null || buffers.getClass() != MultiBufferSource.BufferSource.class) {\n            // If another model render occurs inside the capture, keep its original dispatch.\n",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/BufferedDropPoses.java",
+    "old": "        collecting = entry;\n        collectSource = captureOwner;\n        collectingDraw = false;\n",
+    "new": "        collecting = entry;\n        collectSource = buffers;\n        collectingDraw = false;\n",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/compat/EntityOutlineCompatibility.java",
+    "old": "\nimport java.lang.reflect.Field;\nimport java.lang.reflect.Method;\nimport java.util.Map;\nimport java.util.Set;\nimport java.util.function.BooleanSupplier;\n",
+    "new": "\nimport java.util.Map;\nimport java.util.function.BooleanSupplier;\n",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/compat/EntityOutlineCompatibility.java",
+    "old": "    private static Probe lpctools() throws ReflectiveOperationException {\n        Class<?> highlight = Class.forName(\"lpctools.tools.entityHighlight.EntityHighlight\");\n        Object config = highlight.getField(\"EHConfig\").get(null);\n        Object types = highlight.getField(\"entityList\").get(null);\n        Method enabled = config.getClass().getMethod(\"getBooleanValue\");\n        Method contains = types.getClass().getMethod(\"contains\", EntityType.class);\n        return () -> (boolean) enabled.invoke(config) && (boolean) contains.invoke(types, EntityType.ITEM);\n",
+    "new": "    private static Probe lpctools() throws ReflectiveOperationException {\n        var highlight = Class.forName(\"lpctools.tools.entityHighlight.EntityHighlight\");\n        var config = highlight.getField(\"EHConfig\").get(null);\n        var types = highlight.getField(\"entityList\").get(null);\n        var enabled = config.getClass().getMethod(\"getBooleanValue\");\n        var contains = types.getClass().getMethod(\"contains\", EntityType.class);\n        return () -> (boolean) enabled.invoke(config) && (boolean) contains.invoke(types, EntityType.ITEM);\n",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/compat/EntityOutlineCompatibility.java",
+    "old": "        }\n        Method enabled = manager.getMethod(\"isOutliningEntities\");\n        Map<?, ?> types = (Map<?, ?>) manager.getField(\"outlinedEntityTypes\").get(null);\n        Field outlined = Class.forName(\"net.reentityoutliner.util.EntityTypesProperties\").getField(\"outlined\");\n        return () -> {\n",
+    "new": "        }\n        var enabled = manager.getMethod(\"isOutliningEntities\");\n        var types = (Map<?, ?>) manager.getField(\"outlinedEntityTypes\").get(null);\n        var outlined = Class.forName(\"net.reentityoutliner.util.EntityTypesProperties\").getField(\"outlined\");\n        return () -> {\n",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/compat/EntityOutlineCompatibility.java",
+    "old": "    private static Probe legacyOutliner(String namespace, String entrypoint) throws ReflectiveOperationException {\n        Field enabled = Class.forName(namespace + \".\" + entrypoint).getField(\"outliningEntities\");\n        Class<?> selector;\n        try {\n            selector = Class.forName(namespace + \".ui.EntitySelector\");\n        } catch (ClassNotFoundException original) {\n            selector = Class.forName(namespace + \".EntitySelector\");\n        }\n        Field types = selector.getField(\"outlinedEntityTypes\");\n        return () -> {\n            if (!enabled.getBoolean(null)) return false;\n            Object selected = types.get(null);\n            if (selected instanceof Set<?>) return ((Set<?>) selected).contains(EntityType.ITEM);\n            return selected instanceof Map<?, ?> && ((Map<?, ?>) selected).containsKey(EntityType.ITEM);\n        };\n",
+    "new": "    private static Probe legacyOutliner(String namespace, String entrypoint) throws ReflectiveOperationException {\n        var enabled = Class.forName(namespace + \".\" + entrypoint).getField(\"outliningEntities\");\n        var types = Class.forName(namespace + \".ui.EntitySelector\").getField(\"outlinedEntityTypes\");\n        return () -> {\n            if (!enabled.getBoolean(null)) return false;\n            var selected = (Map<?, ?>) types.get(null);\n            return selected != null && selected.containsKey(EntityType.ITEM);\n        };\n",
+    "count": 1
   }
 ]

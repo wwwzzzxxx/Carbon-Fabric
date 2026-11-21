@@ -4,6 +4,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import first.carbon.Carbon;
+import first.carbon.compat.BufferedDropProvider;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import net.minecraft.client.Minecraft;
@@ -39,6 +40,9 @@ import java.util.Locale;
 import static org.lwjgl.opengl.GL33.*;
 
 public final class ItemBatchRenderer {
+    private final BufferedItemOutlines outlines = new BufferedItemOutlines();
+    private final BufferedDropPoses retainedDrops = BufferedDropProvider.provider().isEmpty()
+            ? null : new BufferedDropPoses(this::replayExternalDrop, this::poseOwner);
     private final Logger logger = LoggerFactory.getLogger("Carbon");
     private final Int2ObjectOpenHashMap<List<GpuItemBatch>> buckets = new Int2ObjectOpenHashMap<>();
     private final Reference2ObjectOpenHashMap<ItemStack, StackCache> stacks = new Reference2ObjectOpenHashMap<>();
@@ -71,6 +75,8 @@ public final class ItemBatchRenderer {
     public int shadowDrawCalls;
 
     public void beginFrame() {
+        outlines.beginFrame();
+        if (retainedDrops != null) retainedDrops.beginFrame();
         if (irisGeneration != Carbon.Client.IRIS.generation) {
             clear();
             irisGeneration = Carbon.Client.IRIS.generation;
@@ -221,10 +227,17 @@ public final class ItemBatchRenderer {
                 && model.getClass() == SimpleBakedModel.class && GL.getCapabilities().OpenGL33) {
             Target first = vertices instanceof Target target ? target : null;
             Target second = null;
+            BufferedItemOutlines.OutlineVertex mask = null;
             if (vertices instanceof VertexPair pair) {
-                first = pair.imo$first() instanceof Target target ? target : null;
-                second = pair.imo$second() instanceof Target target ? target : null;
-                if (second == null) first = null;
+                mask = BufferedItemOutlines.mask(pair);
+                if (mask != null) {
+                    VertexConsumer body = mask == pair.imo$first() ? pair.imo$second() : pair.imo$first();
+                    first = body instanceof Target target ? target : null;
+                } else {
+                    first = pair.imo$first() instanceof Target target ? target : null;
+                    second = pair.imo$second() instanceof Target target ? target : null;
+                    if (second == null) first = null;
+                }
             }
             if (first != null && first.imo$source() != null && supported(first.imo$type())
                     && (second == null || (second.imo$source() == first.imo$source() && supported(second.imo$type())))) {
@@ -284,18 +297,18 @@ public final class ItemBatchRenderer {
                         stacks.put(stack, cached);
                     }
                     cached.lastFrame = frame;
-                    if (cached.batch != null) {
-                        Source source = sources.computeIfAbsent(first.imo$source(), key -> new Source());
+                    if (cached.batch != null && (mask == null || outlines.prepare(mask, first))) {
                         // 先准备全部通道，再写入实例，避免只接管附魔光效的一半。
-                        Submission a = source.layers.computeIfAbsent(first.imo$type(), key -> new Reference2ObjectOpenHashMap<>())
-                                .computeIfAbsent(cached.batch, Submission::new);
-                        Submission b = second == null ? null : source.layers.computeIfAbsent(second.imo$type(), key -> new Reference2ObjectOpenHashMap<>())
-                                .computeIfAbsent(cached.batch, Submission::new);
+                        Submission a = submission(first, cached.batch);
+                        Submission b = second == null ? null : submission(second, cached.batch);
                         if (a.count == 0) Carbon.Client.IRIS.marker(first);
                         if (b != null && b.count == 0) Carbon.Client.IRIS.marker(second);
                         long identifiers = Carbon.Client.IRIS.identifiers();
                         a.add(pose.last(), light, overlay, frame, identifiers);
                         if (b != null) b.add(pose.last(), light, overlay, frame, identifiers);
+                        if (mask != null) outlines.append(cached.batch, a.data, (a.count - 1) * 128, mask.carbon$color());
+                        if (retainedDrops != null) retainedDrops.capture(cached.batch, model, first.imo$type(),
+                                first.imo$source(), a.data, a.count, b == null);
                         cached.batch.lastFrame = frame;
                         instances++;
                         submitted = true;
@@ -304,6 +317,39 @@ public final class ItemBatchRenderer {
             }
         }
         return submitted;
+    }
+
+    public BufferedDropPoses bufferedDropPoses() {
+        return retainedDrops != null && retainedDrops.active() && renderingWorld && !capturing && !failed
+                && Carbon.CONFIG.enabled.get() && !Carbon.Client.IRIS.active() ? retainedDrops : null;
+    }
+
+    private Submission submission(Target target, GpuItemBatch batch) {
+        return sources.computeIfAbsent(target.imo$source(), key -> new Source()).layers
+                .computeIfAbsent(target.imo$type(), key -> new Reference2ObjectOpenHashMap<>())
+                .computeIfAbsent(batch, Submission::new);
+    }
+
+    private boolean replayExternalDrop(BufferedDropPoses.Entry entry, MultiBufferSource buffers) {
+        MultiBufferSource owner = poseOwner(buffers);
+        if (owner == null || !(Carbon.Client.IRIS.getBuffer(buffers, Carbon.Client.IRIS.unwrap(entry.layer)) instanceof Target target)
+                || target.imo$source() != owner || target.imo$type() != entry.layer) return false;
+        Submission draw = submission(target, entry.batch);
+        if (draw.count == 0) Carbon.Client.IRIS.marker(target);
+        draw.addRetained(entry.data, frame);
+        entry.batch.lastFrame = frame;
+        instances++;
+        return true;
+    }
+
+    private MultiBufferSource poseOwner(MultiBufferSource buffers) {
+        Class<?> type = buffers.getClass();
+        if (type == MultiBufferSource.BufferSource.class) return buffers;
+        if (Carbon.Client.IRIS.active() || !Carbon.Client.IRIS.canInstance()) return null;
+        String name = type.getName();
+        return (name.equals("net.coderbot.batchedentityrendering.impl.FullyBufferedMultiBufferSource")
+                || name.equals("net.irisshaders.batchedentityrendering.impl.FullyBufferedMultiBufferSource"))
+                ? buffers : null;
     }
 
     private boolean supported(RenderType type) {
@@ -321,7 +367,12 @@ public final class ItemBatchRenderer {
         return supported;
     }
 
+    public void beforeNativeOutline(VertexConsumer vertices) {
+        outlines.beforeNative(vertices);
+    }
+
     public void flush(MultiBufferSource.BufferSource owner, RenderType type) {
+        outlines.flush(owner, type);
         Source source = sources.get(owner);
         var draws = source == null ? null : source.layers.get(type);
         if (draws != null && draws.values().stream().anyMatch(draw -> draw.count != 0)) {
@@ -425,7 +476,9 @@ public final class ItemBatchRenderer {
     }
 
     public String statistics() {
-        return String.format(Locale.ROOT, "%d model submissions, %d instanced draws, %d shadow instances/%d shadow draws, %d new meshes, %d instance bytes/frame, %d mesh bytes/frame", instances, drawCalls, shadowInstances, shadowDrawCalls, cacheMisses, uploadedBytes, modelBytes);
+        String stats = String.format(Locale.ROOT, "%d model submissions, %d instanced draws, %d shadow instances/%d shadow draws, %d new meshes, %d instance bytes/frame, %d mesh bytes/frame", instances, drawCalls, shadowInstances, shadowDrawCalls, cacheMisses, uploadedBytes, modelBytes);
+        stats += outlines.statistics();
+        return retainedDrops == null ? stats : stats + ", " + retainedDrops.reuses() + " retained external poses";
     }
 
     public void invalidate() {
@@ -437,6 +490,8 @@ public final class ItemBatchRenderer {
     }
 
     private void clear() {
+        outlines.clear();
+        if (retainedDrops != null) retainedDrops.clear();
         for (Source source : sources.values()) {
             for (var draws : source.layers.values()) for (Submission draw : draws.values()) draw.close();
         }
@@ -455,9 +510,9 @@ public final class ItemBatchRenderer {
         failed = false;
     }
 
-    private int compile(int type, String name) throws Exception {
+    static int compile(int type, String name) throws Exception {
         int shader = glCreateShader(type);
-        try (InputStream stream = getClass().getResourceAsStream("/assets/carbon/shaders/" + name)) {
+        try (InputStream stream = ItemBatchRenderer.class.getResourceAsStream("/assets/carbon/shaders/" + name)) {
             if (stream == null) throw new IllegalStateException("Missing shader " + name);
             glShaderSource(shader, new String(stream.readAllBytes(), StandardCharsets.UTF_8));
             glCompileShader(shader);
@@ -519,12 +574,22 @@ public final class ItemBatchRenderer {
             this.batch = batch;
         }
 
-        private void add(PoseStack.Pose pose, int light, int overlay, int frame, long identifiers) {
+        private int reserve(int frame) {
             if (count == capacity) {
                 capacity = Math.max(64, capacity * 2);
                 data = data == null ? MemoryUtil.memAlloc(capacity * 128) : MemoryUtil.memRealloc(data, capacity * 128);
             }
-            int offset = count++ * 128;
+            lastFrame = frame;
+            return count++ * 128;
+        }
+
+        private void addRetained(byte[] packed, int frame) {
+            int offset = reserve(frame);
+            data.put(offset, packed, 0, packed.length);
+        }
+
+        private void add(PoseStack.Pose pose, int light, int overlay, int frame, long identifiers) {
+            int offset = reserve(frame);
             pose.pose().store(data.slice(offset, 64).order(java.nio.ByteOrder.nativeOrder()).asFloatBuffer());
             pose.normal().store(data.slice(offset + 64, 36).order(java.nio.ByteOrder.nativeOrder()).asFloatBuffer());
             data.putInt(offset + 100, light);

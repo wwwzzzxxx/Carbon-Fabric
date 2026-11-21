@@ -37,6 +37,7 @@ final class GpuShadowBatch implements AutoCloseable {
     private final int fogEndUniform;
     private final int fogColorUniform;
     private final int fogShapeUniform;
+    private final int shadowHeightUniform;
     private ByteBuffer data;
     private ByteBuffer previous;
     private ByteBuffer updateData;
@@ -60,6 +61,7 @@ final class GpuShadowBatch implements AutoCloseable {
         fogEndUniform = glGetUniformLocation(program, "FogEnd");
         fogColorUniform = glGetUniformLocation(program, "FogColor");
         fogShapeUniform = glGetUniformLocation(program, "FogShape");
+        shadowHeightUniform = glGetUniformLocation(program, "ShadowHeightFactor");
         int oldVao = glGetInteger(GL_VERTEX_ARRAY_BINDING);
         int oldBuffer = glGetInteger(GL_ARRAY_BUFFER_BINDING);
         vao = glGenVertexArrays();
@@ -183,7 +185,7 @@ final class GpuShadowBatch implements AutoCloseable {
                 glUniform1f(fogStartUniform, first.carbon.compat.RenderCompat.fogStart());
                 glUniform1f(fogEndUniform, first.carbon.compat.RenderCompat.fogEnd());
                 glUniform1i(fogShapeUniform, first.carbon.compat.RenderCompat.fogShape());
-                glUniform1f(glGetUniformLocation(program, "ShadowHeightFactor"), first.carbon.compat.RenderCompat.shadowHeightFactor());
+                glUniform1f(shadowHeightUniform, first.carbon.compat.RenderCompat.shadowHeightFactor());
                 glBindVertexArray(vao);
                 glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, count);
 

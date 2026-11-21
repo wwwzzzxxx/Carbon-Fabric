@@ -2,11 +2,19 @@ package first.carbon.compat;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
+import net.fabricmc.loader.api.FabricLoader;
 import org.slf4j.LoggerFactory;
 
-// Preserve renderer-level transforms supplied by TweakerMore's precise item models.
+// Let mods that replace item poses run before Carbon batches their model submissions.
 public final class ItemEntityCompatibility {
+    private static final boolean externalDropTransforms = detectExternalDropTransforms();
     private MethodHandle preciseModel;
+
+    private static boolean detectExternalDropTransforms() {
+        var loader = FabricLoader.getInstance();
+        return loader.isModLoaded("itemdrops") || loader.isModLoaded("itemphysic")
+                || loader.isModLoaded("itemphysiclite");
+    }
 
     public ItemEntityCompatibility() {
         try {
@@ -19,7 +27,12 @@ public final class ItemEntityCompatibility {
         }
     }
 
+    public static boolean hasExternalDropTransforms() {
+        return externalDropTransforms;
+    }
+
     public boolean requiresEntityTransforms() {
+        if (externalDropTransforms) return true;
         if (preciseModel != null) {
             try {
                 return (boolean) preciseModel.invokeExact();

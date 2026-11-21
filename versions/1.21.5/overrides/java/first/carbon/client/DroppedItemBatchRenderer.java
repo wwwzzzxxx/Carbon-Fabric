@@ -54,6 +54,7 @@ import static org.lwjgl.opengl.GL33.*;
 public final class DroppedItemBatchRenderer {
     private final Logger logger = LoggerFactory.getLogger("Carbon");
     private final Int2ObjectOpenHashMap<List<GpuDroppedItemBatch>> buckets = new Int2ObjectOpenHashMap<>();
+    private final Int2ObjectOpenHashMap<DroppedItemUniforms> uniforms = new Int2ObjectOpenHashMap<>();
     private final Set<ItemGeometry> rejected = Collections.newSetFromMap(new IdentityHashMap<>());
     final IdentityHashMap<TextureAtlasSprite, Boolean> opaqueSprites = new IdentityHashMap<>();
     private final Matrix4f view = new Matrix4f();
@@ -318,7 +319,7 @@ public final class DroppedItemBatchRenderer {
         boolean submitted = false;
         boolean shadow = Carbon.Client.IRIS.shadowPass();
         if (active && !capturing && entity.level() == level && level.getEntity(entity.getId()) == entity
-                && !entity.isCurrentlyGlowing() && (!shadow || physics)) {
+                && !Minecraft.getInstance().shouldEntityAppearGlowing(entity) && (!shadow || physics)) {
             if (entity.tickCount == 0) {
                 entity.xOld = entity.getX();
                 entity.yOld = entity.getY();
@@ -780,7 +781,9 @@ public final class DroppedItemBatchRenderer {
                 for (List<GpuDroppedItemBatch> bucket : buckets.values()) {
                     for (GpuDroppedItemBatch batch : bucket) {
                         if (batch.count > 0 && !batch.flushed) {
-                            batch.processed = batch.entityBatch && processor != null;
+                            // Small meshes can rotate in the existing vertex draw without a compute dispatch.
+                            batch.processed = batch.entityBatch && processor != null && (batch.physics || batch.foil
+                                    || batch.meshes.size() != 1 || batch.meshes.get(0).indices > 64 * 6);
                             int drawProgram = batch.entityBatch ? batch.processed ? preparedProgram : entityProgram : program;
                             uploadedBytes += batch.upload();
                             if (batch.processed && processor.prepare(batch, clock)) transformDispatches++;
@@ -807,33 +810,31 @@ public final class DroppedItemBatchRenderer {
                                                     irisCamera, clock, batch.groundScaleY, batch.center, batch.halfSize, batch.flat);
                                         } else {
                                             glUseProgram(drawProgram);
-                                            glUniform1i(glGetUniformLocation(drawProgram, "GlintPass"), pass);
-                                            glUniformMatrix4fv(glGetUniformLocation(drawProgram, "TextureMat"), false, first.carbon.compat.RenderCompat.floats(RenderSystem.getTextureMatrix(), matrix));
-                                            glUniform1f(glGetUniformLocation(drawProgram, "GlintAlpha"), RenderSystem.getShaderGlintAlpha());
-                                            glUniformMatrix4fv(glGetUniformLocation(drawProgram, "View"), false, view.get(matrix));
-                                            glUniformMatrix4fv(glGetUniformLocation(drawProgram, "Projection"), false, projection.get(matrix));
-                                            glUniform3f(glGetUniformLocation(drawProgram, "Camera"), (float) (camera.x - originX),
+                                            DroppedItemUniforms binding = uniforms.computeIfAbsent(drawProgram, DroppedItemUniforms::new);
+                                            glUniform1i(binding.glintPass, pass);
+                                            glUniformMatrix4fv(binding.textureMatrix, false, first.carbon.compat.RenderCompat.floats(RenderSystem.getTextureMatrix(), matrix));
+                                            glUniform1f(binding.glintAlpha, RenderSystem.getShaderGlintAlpha());
+                                            glUniformMatrix4fv(binding.view, false, view.get(matrix));
+                                            glUniformMatrix4fv(binding.projection, false, projection.get(matrix));
+                                            glUniform3f(binding.camera, (float) (camera.x - originX),
                                                     (float) (camera.y - originY), (float) (camera.z - originZ));
-                                            glUniform1f(glGetUniformLocation(drawProgram, "Clock"), clock);
-                                            glUniform1f(glGetUniformLocation(drawProgram, "GroundScaleY"), batch.groundScaleY);
+                                            glUniform1f(binding.clock, clock);
+                                            glUniform1f(binding.groundScaleY, batch.groundScaleY);
                                             if (batch.physics) {
-                                                glUniform3f(glGetUniformLocation(drawProgram, "Center"), batch.center.x, batch.center.y, batch.center.z);
-                                                glUniform3f(glGetUniformLocation(drawProgram, "HalfSize"), batch.halfSize.x, batch.halfSize.y, batch.halfSize.z);
-                                                glUniform1i(glGetUniformLocation(drawProgram, "Flat"), batch.flat ? 1 : 0);
-                                            }
-                                            for (int sampler = 0; sampler < 3; sampler++) {
-                                                glUniform1i(glGetUniformLocation(drawProgram, "Sampler" + sampler), sampler);
+                                                glUniform3f(binding.center, batch.center.x, batch.center.y, batch.center.z);
+                                                glUniform3f(binding.halfSize, batch.halfSize.x, batch.halfSize.y, batch.halfSize.z);
+                                                glUniform1i(binding.flat, batch.flat ? 1 : 0);
                                             }
                                             float[] fog = first.carbon.compat.RenderCompat.fogColor();
-                                            glUniform4f(glGetUniformLocation(drawProgram, "FogColor"), fog[0], fog[1], fog[2], fog[3]);
+                                            glUniform4f(binding.fogColor, fog[0], fog[1], fog[2], fog[3]);
                                             float[] color = RenderSystem.getShaderColor();
-                                            glUniform4f(glGetUniformLocation(drawProgram, "ColorModulator"), color[0], color[1], color[2], color[3]);
-                                            glUniform1f(glGetUniformLocation(drawProgram, "FogStart"), first.carbon.compat.RenderCompat.fogStart());
-                                            glUniform1f(glGetUniformLocation(drawProgram, "FogEnd"), first.carbon.compat.RenderCompat.fogEnd());
-                                            glUniform1i(glGetUniformLocation(drawProgram, "FogShape"), first.carbon.compat.RenderCompat.fogShape());
+                                            glUniform4f(binding.color, color[0], color[1], color[2], color[3]);
+                                            glUniform1f(binding.fogStart, first.carbon.compat.RenderCompat.fogStart());
+                                            glUniform1f(binding.fogEnd, first.carbon.compat.RenderCompat.fogEnd());
+                                            glUniform1i(binding.fogShape, first.carbon.compat.RenderCompat.fogShape());
                                             if (vanilla != null && vanilla.LIGHT0_DIRECTION != null && vanilla.LIGHT1_DIRECTION != null) {
-                                                glUniform3f(glGetUniformLocation(drawProgram, "Light0"),RenderSystem.getShaderLights()[0].x(),RenderSystem.getShaderLights()[0].y(),RenderSystem.getShaderLights()[0].z());
-                                                glUniform3f(glGetUniformLocation(drawProgram, "Light1"),RenderSystem.getShaderLights()[1].x(),RenderSystem.getShaderLights()[1].y(),RenderSystem.getShaderLights()[1].z());
+                                                glUniform3f(binding.light0,RenderSystem.getShaderLights()[0].x(),RenderSystem.getShaderLights()[0].y(),RenderSystem.getShaderLights()[0].z());
+                                                glUniform3f(binding.light1,RenderSystem.getShaderLights()[1].x(),RenderSystem.getShaderLights()[1].y(),RenderSystem.getShaderLights()[1].z());
                                             }
                                             mesh.bind();
                                             glDrawElementsInstanced(GL_TRIANGLES, mesh.indices, GL_UNSIGNED_INT, 0, batch.count);
@@ -912,6 +913,7 @@ public final class DroppedItemBatchRenderer {
     }
 
     private void clear() {
+        uniforms.clear();
         directItems.clear();
         directShadows.begin(true, 0);
         first.carbon.compat.ItemGeometry.clear();

@@ -6,24 +6,24 @@ Each row corresponds to one Minecraft version and one Fabric JAR. The table show
 
 | Minecraft | Carbon JAR | Fabric Loader | Java |
 |---|---|---:|---:|
-| 1.16.5 | `carbon-1.16.5.9-fabric.14.jar` | ≥ 0.14.25 | ≥ 8 |
-| 1.17.1 | `carbon-1.17.1.9-fabric.8.jar` | ≥ 0.16.5 | ≥ 16 |
-| 1.18.2 | `carbon-1.18.2.9-fabric.14.jar` | ≥ 0.16.5 | ≥ 17 |
-| 1.19.4 | `carbon-1.19.4.9-fabric.7.jar` | ≥ 0.16.5 | ≥ 17 |
-| 1.20.1 | `carbon-1.20.1.9-fabric.7.jar` | ≥ 0.15.11 | ≥ 17 |
-| 1.20.2 | `carbon-1.20.2.9-fabric.7.jar` | ≥ 0.15.11 | ≥ 17 |
-| 1.20.4 | `carbon-1.20.4.9-fabric.8.jar` | ≥ 0.15.11 | ≥ 17 |
-| 1.20.6 | `carbon-1.20.6.9-fabric.7.jar` | ≥ 0.15.11 | ≥ 21 |
-| 1.21.1 | `carbon-1.21.1.9-fabric.7.jar` | ≥ 0.15.11 | ≥ 21 |
-| 1.21.3 | `carbon-1.21.3.9-fabric.6.jar` | ≥ 0.15.11 | ≥ 21 |
-| 1.21.4 | `carbon-1.21.4.9-fabric.7.jar` | ≥ 0.15.11 | ≥ 21 |
-| 1.21.5 | `carbon-1.21.5.9-fabric.13.jar` | ≥ 0.15.11 | ≥ 21 |
-| 1.21.8 | `carbon-1.21.8.9-fabric.11.jar` | ≥ 0.15.11 | ≥ 21 |
-| 1.21.10 | `carbon-1.21.10.9-fabric.10.jar` | ≥ 0.15.11 | ≥ 21 |
-| 1.21.11 | `carbon-1.21.11.9-fabric.10.jar` | ≥ 0.15.11 | ≥ 21 |
-| 26.1.2 | `carbon-26.1.2.9-fabric.10.jar` | ≥ 0.18.4 | ≥ 25 |
-| 26.2 | `carbon-26.2.9-fabric.10.jar` | ≥ 0.18.4 | ≥ 25 |
-| 26.3 | `carbon-26.3.9-fabric.7.jar` | ≥ 0.18.4 | ≥ 25 |
+| 1.16.5 | `carbon-1.16.5.9-fabric.19.jar` | ≥ 0.14.25 | ≥ 8 |
+| 1.17.1 | `carbon-1.17.1.9-fabric.17.jar` | ≥ 0.16.5 | ≥ 16 |
+| 1.18.2 | `carbon-1.18.2.9-fabric.18.jar` | ≥ 0.16.5 | ≥ 17 |
+| 1.19.4 | `carbon-1.19.4.9-fabric.18.jar` | ≥ 0.16.5 | ≥ 17 |
+| 1.20.1 | `carbon-1.20.1.9-fabric.17.jar` | ≥ 0.15.11 | ≥ 17 |
+| 1.20.2 | `carbon-1.20.2.9-fabric.18.jar` | ≥ 0.15.11 | ≥ 17 |
+| 1.20.4 | `carbon-1.20.4.9-fabric.18.jar` | ≥ 0.15.11 | ≥ 17 |
+| 1.20.6 | `carbon-1.20.6.9-fabric.18.jar` | ≥ 0.15.11 | ≥ 21 |
+| 1.21.1 | `carbon-1.21.1.9-fabric.17.jar` | ≥ 0.15.11 | ≥ 21 |
+| 1.21.3 | `carbon-1.21.3.9-fabric.16.jar` | ≥ 0.15.11 | ≥ 21 |
+| 1.21.4 | `carbon-1.21.4.9-fabric.17.jar` | ≥ 0.15.11 | ≥ 21 |
+| 1.21.5 | `carbon-1.21.5.9-fabric.18.jar` | ≥ 0.15.11 | ≥ 21 |
+| 1.21.8 | `carbon-1.21.8.9-fabric.20.jar` | ≥ 0.15.11 | ≥ 21 |
+| 1.21.10 | `carbon-1.21.10.9-fabric.16.jar` | ≥ 0.15.11 | ≥ 21 |
+| 1.21.11 | `carbon-1.21.11.9-fabric.16.jar` | ≥ 0.15.11 | ≥ 21 |
+| 26.1.2 | `carbon-26.1.2.9-fabric.16.jar` | ≥ 0.18.4 | ≥ 25 |
+| 26.2 | `carbon-26.2.9-fabric.17.jar` | ≥ 0.18.4 | ≥ 25 |
+| 26.3 | `carbon-26.3.9-fabric.16.jar` | ≥ 0.18.4 | ≥ 25 |
 
 ## Build / 构建
 

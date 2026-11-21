@@ -23,7 +23,8 @@
     "ImageReadLimitMixin",
     "CommandEncoderAccess",
     "GpuDeviceAccess",
-    "ItemModelSubmissionMixin"
+    "ItemModelSubmissionMixin",
+    "ReEntityOutlinerItemLookupMixin"
   ],
   "injectors": {
     "defaultRequire": 1

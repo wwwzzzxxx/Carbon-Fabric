@@ -241,21 +241,19 @@ public final class ItemBatchRenderer {
                             bucket.add(batch);modelBytes += batch.meshBytes;cacheMisses++;
                         } catch (Exception exception) { logger.debug("Retaining original model rendering: {}",exception.toString()); }
                     }
-                    StackCache cached = new StackCache(model,0,batch);
-                    cached.lastFrame = frame;
-                    if (cached.batch != null) {
+                    if (batch != null) {
                         Source source = sources.computeIfAbsent(primaryTarget.imo$source(), key -> new Source());
                         // 先准备全部通道，再写入实例，避免只接管附魔光效的一半。
                         Submission a = source.layers.computeIfAbsent(primaryTarget.imo$type(), key -> new Reference2ObjectOpenHashMap<>())
-                                .computeIfAbsent(cached.batch, Submission::new);
+                                .computeIfAbsent(batch, Submission::new);
                         Submission b = second == null ? null : source.layers.computeIfAbsent(second.imo$type(), key -> new Reference2ObjectOpenHashMap<>())
-                                .computeIfAbsent(cached.batch, Submission::new);
+                                .computeIfAbsent(batch, Submission::new);
                         if (a.count == 0) Carbon.Client.IRIS.marker(primaryTarget);
                         if (b != null && b.count == 0) Carbon.Client.IRIS.marker(second);
                         long identifiers = Carbon.Client.IRIS.identifiers();
                         a.add(pose.last(), light, overlay, frame, identifiers);
                         if (b != null) b.add(pose.last(), light, overlay, frame, identifiers);
-                        cached.batch.lastFrame = frame;
+                        batch.lastFrame = frame;
                         instances++;
                         submitted = true;
                     }

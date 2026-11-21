@@ -1,15 +1,20 @@
 package first.carbon.client;
 
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.BufferBuilder;
+import com.mojang.blaze3d.vertex.ByteBufferBuilder;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import first.carbon.Carbon;
+import first.carbon.compat.BufferedDropProvider;
+import first.carbon.compat.RenderCompat;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Camera;
 import net.minecraft.client.renderer.entity.ItemEntityRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.OutlineBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import com.mojang.blaze3d.opengl.GlProgram;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
@@ -38,6 +43,9 @@ import java.util.Locale;
 import static org.lwjgl.opengl.GL33.*;
 
 public final class ItemBatchRenderer {
+    private final BufferedItemOutlines outlines = new BufferedItemOutlines();
+    private final BufferedDropPoses retainedDrops = BufferedDropProvider.provider().isEmpty()
+            ? null : new BufferedDropPoses(this::replayExternalDrop, this::poseOwner);
     private final Logger logger = LoggerFactory.getLogger("Carbon");
     private final Int2ObjectOpenHashMap<List<GpuItemBatch>> buckets = new Int2ObjectOpenHashMap<>();
     private final Reference2ObjectOpenHashMap<ItemStack, StackCache> stacks = new Reference2ObjectOpenHashMap<>();
@@ -59,6 +67,11 @@ public final class ItemBatchRenderer {
     private Vec3 shadowCamera = Vec3.ZERO;
     private double originX, originY, originZ;
     private boolean world;
+    // Iris batches native vertices itself. Carbon issues these world-body
+    // batches in the entity pass while the world projection is still bound.
+    private MultiBufferSource.BufferSource deferredBodies;
+    private final java.util.LinkedHashMap<RenderType, Target> deferredTargets = new java.util.LinkedHashMap<>();
+    private boolean insideEntityPass;
     boolean capturing;
     public int instances;
     public int drawCalls;
@@ -69,6 +82,8 @@ public final class ItemBatchRenderer {
     public int shadowDrawCalls;
 
     public void beginFrame() {
+        outlines.beginFrame();
+        if (retainedDrops != null) retainedDrops.beginFrame();
         if (irisGeneration != Carbon.Client.IRIS.generation) {
             clear();
             irisGeneration = Carbon.Client.IRIS.generation;
@@ -82,6 +97,7 @@ public final class ItemBatchRenderer {
         shadowInstances = 0;
         shadowDrawCalls = 0;
         world = false;
+        insideEntityPass = false;
         if (stacks.size() > 16384) stacks.values().removeIf(cache -> frame - cache.lastFrame > 1);
         if ((frame & 63) == 0) {
             long allocated = 0;
@@ -208,16 +224,30 @@ public final class ItemBatchRenderer {
         world = false;
     }
 
-    public boolean submit(ItemGeometry model, int[] tintLayers, int light, int overlay, PoseStack pose, VertexConsumer vertices) {
+    public boolean submit(ItemGeometry model, int[] tintLayers, int light, int overlay, PoseStack pose,
+                          VertexConsumer vertices, RenderType deferredLayer) {
         boolean submitted = false;
         if (!capturing && first.carbon.compat.RenderCompat.world && !failed && Carbon.CONFIG.enabled.get() && Carbon.Client.IRIS.canInstance()
                 && model.getClass() == ItemGeometry.class && GL.getCapabilities().OpenGL33) {
             Target first = vertices instanceof Target target ? target : null;
+            VertexConsumer body = vertices;
             Target second = null;
+            BufferedItemOutlines.OutlineVertex mask = null;
             if (vertices instanceof VertexPair pair) {
-                first = pair.imo$first() instanceof Target target ? target : null;
-                second = pair.imo$second() instanceof Target target ? target : null;
-                if (second == null) first = null;
+                mask = BufferedItemOutlines.mask(pair);
+                if (mask != null) {
+                    body = mask == pair.imo$first() ? pair.imo$second() : pair.imo$first();
+                    first = body instanceof Target target ? target : null;
+                } else {
+                    first = pair.imo$first() instanceof Target target ? target : null;
+                    second = pair.imo$second() instanceof Target target ? target : null;
+                    if (second == null) first = null;
+                }
+            }
+            if (insideEntityPass && (first == null || first.imo$source() == null) && second == null && deferredLayer != null
+                    && (body instanceof BufferBuilder || first != null)
+                    && supported(deferredLayer)) {
+                first = deferredTarget(deferredLayer);
             }
             if (first != null && first.imo$source() != null && supported(first.imo$type())
                     && (second == null || (second.imo$source() == first.imo$source() && supported(second.imo$type())))) {
@@ -260,18 +290,18 @@ public final class ItemBatchRenderer {
                     }
                     StackCache cached = new StackCache(model,0,batch);
                     cached.lastFrame = frame;
-                    if (cached.batch != null) {
-                        Source source = sources.computeIfAbsent(first.imo$source(), key -> new Source());
+                    if (cached.batch != null && (mask == null || outlines.prepare(mask, first))) {
                         // 先准备全部通道，再写入实例，避免只接管附魔光效的一半。
-                        Submission a = source.layers.computeIfAbsent(first.imo$type(), key -> new Reference2ObjectOpenHashMap<>())
-                                .computeIfAbsent(cached.batch, Submission::new);
-                        Submission b = second == null ? null : source.layers.computeIfAbsent(second.imo$type(), key -> new Reference2ObjectOpenHashMap<>())
-                                .computeIfAbsent(cached.batch, Submission::new);
+                        Submission a = submission(first, cached.batch);
+                        Submission b = second == null ? null : submission(second, cached.batch);
                         if (a.count == 0) Carbon.Client.IRIS.marker(first);
                         if (b != null && b.count == 0) Carbon.Client.IRIS.marker(second);
                         long identifiers = Carbon.Client.IRIS.identifiers();
                         a.add(pose.last(), light, overlay, frame, identifiers);
                         if (b != null) b.add(pose.last(), light, overlay, frame, identifiers);
+                        if (mask != null) outlines.append(cached.batch, a.data, (a.count - 1) * 128, mask.carbon$color());
+                        if (retainedDrops != null) retainedDrops.capture(cached.batch, model.quads, first.imo$type(),
+                                first.imo$source(), a.data, a.count, b == null);
                         cached.batch.lastFrame = frame;
                         instances++;
                         submitted = true;
@@ -280,6 +310,51 @@ public final class ItemBatchRenderer {
             }
         }
         return submitted;
+    }
+
+    public BufferedDropPoses bufferedDropPoses() {
+        return retainedDrops != null && retainedDrops.active() && RenderCompat.world && !capturing && !failed
+                && Carbon.CONFIG.enabled.get() && !Carbon.Client.IRIS.active() ? retainedDrops : null;
+    }
+
+    private Submission submission(Target target, GpuItemBatch batch) {
+        return sources.computeIfAbsent(target.imo$source(), key -> new Source()).layers
+                .computeIfAbsent(target.imo$type(), key -> new Reference2ObjectOpenHashMap<>())
+                .computeIfAbsent(batch, Submission::new);
+    }
+
+    private boolean replayExternalDrop(BufferedDropPoses.Entry entry, MultiBufferSource buffers) {
+        MultiBufferSource owner = poseOwner(buffers);
+        if (owner == null) return false;
+        Target target;
+        if (owner == deferredBodies) {
+            target = deferredTarget(entry.layer);
+        } else {
+            if (!(Carbon.Client.IRIS.getBuffer(buffers, entry.layer) instanceof Target nativeTarget)
+                    || nativeTarget.imo$source() != owner || nativeTarget.imo$type() != entry.layer) return false;
+            target = nativeTarget;
+        }
+        Submission draw = submission(target, entry.batch);
+        if (draw.count == 0) Carbon.Client.IRIS.marker(target);
+        draw.addRetained(entry.data, frame);
+        entry.batch.lastFrame = frame;
+        instances++;
+        return true;
+    }
+
+    private MultiBufferSource poseOwner(MultiBufferSource buffers) {
+        if (buffers.getClass() == MultiBufferSource.BufferSource.class) return buffers;
+        return insideEntityPass && !(buffers instanceof OutlineBufferSource) && Carbon.Client.IRIS.defersWorldBuffers(buffers)
+                ? deferredBodies() : null;
+    }
+
+    private MultiBufferSource.BufferSource deferredBodies() {
+        if (deferredBodies == null) deferredBodies = MultiBufferSource.immediate(new ByteBufferBuilder(256));
+        return deferredBodies;
+    }
+
+    private Target deferredTarget(RenderType layer) {
+        return deferredTargets.computeIfAbsent(layer, key -> new DeferredTarget(deferredBodies(), key));
     }
 
     private boolean supported(RenderType type) {
@@ -297,7 +372,22 @@ public final class ItemBatchRenderer {
         return supported;
     }
 
+    public void beforeNativeOutline(VertexConsumer vertices) {
+        outlines.beforeNative(vertices);
+    }
+
+    public void beginEntityPass() {
+        insideEntityPass = true;
+    }
+
+    public void endEntityPass() {
+        insideEntityPass = false;
+        if (deferredBodies == null) return;
+        for (RenderType layer : deferredTargets.keySet()) flush(deferredBodies, layer);
+    }
+
     public void flush(MultiBufferSource.BufferSource owner, RenderType type) {
+        outlines.flush(owner, type);
         Source source = sources.get(owner);
         var draws = source == null ? null : source.layers.get(type);
         if (draws != null && draws.values().stream().anyMatch(draw -> draw.count != 0)) {
@@ -389,7 +479,9 @@ public final class ItemBatchRenderer {
     }
 
     public String statistics() {
-        return String.format(Locale.ROOT, "%d model submissions, %d instanced draws, %d shadow instances/%d shadow draws, %d new meshes, %d instance bytes/frame, %d mesh bytes/frame", instances, drawCalls, shadowInstances, shadowDrawCalls, cacheMisses, uploadedBytes, modelBytes);
+        String stats = String.format(Locale.ROOT, "%d model submissions, %d instanced draws, %d shadow instances/%d shadow draws, %d new meshes, %d instance bytes/frame, %d mesh bytes/frame", instances, drawCalls, shadowInstances, shadowDrawCalls, cacheMisses, uploadedBytes, modelBytes);
+        stats += outlines.statistics();
+        return retainedDrops == null ? stats : stats + ", " + retainedDrops.reuses() + " retained external poses";
     }
 
     public void invalidate() {
@@ -401,6 +493,8 @@ public final class ItemBatchRenderer {
     }
 
     private void clear() {
+        outlines.clear();
+        if (retainedDrops != null) retainedDrops.clear();
         for (Source source : sources.values()) {
             for (var draws : source.layers.values()) for (Submission draw : draws.values()) draw.close();
         }
@@ -419,9 +513,9 @@ public final class ItemBatchRenderer {
         failed = false;
     }
 
-    private int compile(int type, String name) throws Exception {
+    static int compile(int type, String name) throws Exception {
         int shader = glCreateShader(type);
-        try (InputStream stream = getClass().getResourceAsStream("/assets/carbon/shaders/" + name)) {
+        try (InputStream stream = ItemBatchRenderer.class.getResourceAsStream("/assets/carbon/shaders/" + name)) {
             if (stream == null) throw new IllegalStateException("Missing shader " + name);
             glShaderSource(shader, new String(stream.readAllBytes(), StandardCharsets.UTF_8));
             glCompileShader(shader);
@@ -447,6 +541,13 @@ public final class ItemBatchRenderer {
         MultiBufferSource.BufferSource imo$source();
         RenderType imo$type();
         void imo$target(MultiBufferSource.BufferSource source, RenderType type);
+    }
+
+    private record DeferredTarget(MultiBufferSource.BufferSource imo$source, RenderType imo$type) implements Target {
+        @Override
+        public void imo$target(MultiBufferSource.BufferSource source, RenderType type) {
+            throw new UnsupportedOperationException();
+        }
     }
 
     public interface VertexPair {
@@ -483,12 +584,22 @@ public final class ItemBatchRenderer {
             this.batch = batch;
         }
 
-        private void add(PoseStack.Pose pose, int light, int overlay, int frame, long identifiers) {
+        private int reserve(int frame) {
             if (count == capacity) {
                 capacity = Math.max(64, capacity * 2);
                 data = data == null ? MemoryUtil.memAlloc(capacity * 128) : MemoryUtil.memRealloc(data, capacity * 128);
             }
-            int offset = count++ * 128;
+            lastFrame = frame;
+            return count++ * 128;
+        }
+
+        private void addRetained(byte[] packed, int frame) {
+            int offset = reserve(frame);
+            data.put(offset, packed, 0, packed.length);
+        }
+
+        private void add(PoseStack.Pose pose, int light, int overlay, int frame, long identifiers) {
+            int offset = reserve(frame);
             pose.pose().get(data.slice(offset, 64).order(java.nio.ByteOrder.nativeOrder()).asFloatBuffer());
             pose.normal().get(data.slice(offset + 64, 36).order(java.nio.ByteOrder.nativeOrder()).asFloatBuffer());
             data.putInt(offset + 100, light);

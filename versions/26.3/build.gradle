@@ -1,5 +1,5 @@
 plugins { id 'net.fabricmc.fabric-loom' }
-version = '26.3.9-fabric.7'
+version = '26.3.9-fabric.16'
 group = 'first.carbon'
 base { archivesName = 'carbon' }
 repositories { mavenCentral(); maven { url='https://api.modrinth.com/maven' } }
@@ -15,6 +15,7 @@ dependencies {
 def generated = layout.buildDirectory.dir('generated/carbon')
 tasks.register('prepareVersionSources', Exec) {
     inputs.dir '../../src/main'
+    inputs.dir '../../src/outline'
     inputs.dir '../../src/renderstate'
     inputs.dir 'overrides'
     inputs.file 'patches.json'

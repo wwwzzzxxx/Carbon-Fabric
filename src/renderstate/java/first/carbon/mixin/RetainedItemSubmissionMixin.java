@@ -17,7 +17,7 @@ abstract class RetainedItemSubmissionMixin {
     @Inject(method = "submit", at = @At("HEAD"), cancellable = true)
     private void carbon$submitRetained(EntityRenderState state, CameraRenderState camera, double x, double y, double z,
                                       PoseStack pose, SubmitNodeCollector collector, CallbackInfo ci) {
-        if (state instanceof ItemEntityRenderState item && Carbon.Client.DROPPED_RENDERER.submitRetained(item, pose)) {
+        if (state instanceof ItemEntityRenderState item && Carbon.Client.DROPPED_RENDERER.submitRetained(item, pose, collector)) {
             ci.cancel();
         }
     }

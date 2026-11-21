@@ -35,6 +35,7 @@ final class GpuDroppedItemBatch implements AutoCloseable {
     final ItemGeometry model;
     final int[] tintLayers;
     final RenderType baseType;
+    final RenderType outlineType;
     final List<Mesh> meshes = new ArrayList<>();
     final List<TextureAtlasSprite> sprites = new ArrayList<>();
     final float groundScaleY;
@@ -73,12 +74,13 @@ final class GpuDroppedItemBatch implements AutoCloseable {
     int retainedCount;
 
     GpuDroppedItemBatch(ItemStack stack, first.carbon.compat.RenderCompat.ResolvedItem resolved,
-                        DroppedItemBatchRenderer renderer, boolean entityBatch, boolean foil) {
+                        DroppedItemBatchRenderer renderer, boolean entityBatch, boolean foil, RenderType outlineType) {
         this.stack = stack.copy();
         ItemGeometry model = resolved.model();
         this.model = model;
         tintLayers = resolved.tints().clone();
         baseType = resolved.type();
+        this.outlineType = outlineType;
         this.entityBatch = entityBatch;
         this.foil = foil;
         physics = entityBatch && renderer.physics;
@@ -213,6 +215,16 @@ final class GpuDroppedItemBatch implements AutoCloseable {
         data.putFloat(offset + 128, y);
         data.putFloat(offset + 132, z);
         data.putLong(offset + 136, 0);
+    }
+
+    void copyLastInstance(byte[] instance) {
+        data.get((count - 1) * instanceStride, instance);
+    }
+
+    void addRetainedInstance(byte[] instance) {
+        dirty = true;
+        ensureCapacity(1);
+        data.put(count++ * instanceStride, instance);
     }
 
     // Negative z stores a compact 3D offset; nonnegative z stores the flat-item layer.

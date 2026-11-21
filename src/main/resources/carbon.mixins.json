@@ -4,6 +4,10 @@
   "package": "first.carbon.mixin",
   "compatibilityLevel": "JAVA_17",
   "client": [
+    "OutlineShaderMixin",
+    "BufferedOutlineBuilderMixin",
+    "BufferedOutlineGeneratorMixin",
+    "BufferedOutlineSourceMixin",
     "ItemRendererMixin",
     "ItemStackFoilMixin",
     "BufferBuilderMixin",

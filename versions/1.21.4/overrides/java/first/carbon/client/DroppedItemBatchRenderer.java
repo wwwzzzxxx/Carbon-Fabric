@@ -317,7 +317,7 @@ public final class DroppedItemBatchRenderer {
         boolean submitted = false;
         boolean shadow = Carbon.Client.IRIS.shadowPass();
         if (active && !capturing && entity.level() == level && level.getEntity(entity.getId()) == entity
-                && !entity.isCurrentlyGlowing() && (!shadow || physics)) {
+                && !Minecraft.getInstance().shouldEntityAppearGlowing(entity) && (!shadow || physics)) {
             if (entity.tickCount == 0) {
                 entity.xOld = entity.getX();
                 entity.yOld = entity.getY();

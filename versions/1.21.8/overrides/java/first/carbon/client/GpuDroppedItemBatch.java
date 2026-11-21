@@ -35,6 +35,7 @@ final class GpuDroppedItemBatch implements AutoCloseable {
     final ItemGeometry model;
     final int[] tintLayers;
     final RenderType baseType;
+    final RenderType outlineType;
     final List<Mesh> meshes = new ArrayList<>();
     final List<TextureAtlasSprite> sprites = new ArrayList<>();
     final float groundScaleY;
@@ -72,12 +73,14 @@ final class GpuDroppedItemBatch implements AutoCloseable {
     boolean processed;
     int retainedCount;
 
-    GpuDroppedItemBatch(ItemStack stack, ItemGeometry model, DroppedItemBatchRenderer renderer, boolean entityBatch, boolean foil) {
+    GpuDroppedItemBatch(ItemStack stack, ItemGeometry model, DroppedItemBatchRenderer renderer, boolean entityBatch,
+                        boolean foil, RenderType outlineType) {
         this.stack = stack.copy();
         this.model = model;
         var resolved = first.carbon.compat.RenderCompat.resolved(stack);
         tintLayers = resolved.tints().clone();
         baseType = resolved.type();
+        this.outlineType = outlineType;
         this.entityBatch = entityBatch;
         this.foil = foil;
         physics = entityBatch && renderer.physics;

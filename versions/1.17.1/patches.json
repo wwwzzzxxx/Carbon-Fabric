@@ -1,8 +1,8 @@
 [
   {
     "file": "resources/fabric.mod.json",
-    "old": "\"mixins\": [\"carbon.mixins.json\"]",
-    "new": "\"mixins\": [\"carbon.mixins.json\", \"carbon.iris1171.mixins.json\"]",
+    "old": "\"mixins\": [\"carbon.mixins.json\", \"carbon.buffered-drops.mixins.json\"]",
+    "new": "\"mixins\": [\"carbon.mixins.json\", \"carbon.buffered-drops.mixins.json\", \"carbon.iris1171.mixins.json\"]",
     "count": 1
   },
   {
@@ -87,6 +87,24 @@
     "file": "java/first/carbon/compat/EntityCullingCompatibility.java",
     "old": "\n                && (minecraft.level.isOutsideBuildHeight(item.blockPosition().getY())\n                    || minecraft.levelRenderer.isChunkCompiled(item.blockPosition()))",
     "new": "",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/ItemBatchRenderer.java",
+    "old": "    private final BufferedDropPoses retainedDrops = BufferedDropProvider.provider().isEmpty()\n            ? null : new BufferedDropPoses(this::replayExternalDrop, this::poseOwner);\n    private final Logger logger = LogManager.getLogger(\"Carbon\");\n",
+    "new": "    private final BufferedDropPoses retainedDrops = BufferedDropProvider.provider().isEmpty()\n            ? null : new BufferedDropPoses(this::replayExternalDrop);\n    private final Logger logger = LogManager.getLogger(\"Carbon\");\n",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/ItemBatchRenderer.java",
+    "old": "    private boolean replayExternalDrop(BufferedDropPoses.Entry entry, MultiBufferSource buffers) {\n        MultiBufferSource owner = poseOwner(buffers);\n        if (owner == null || !(Carbon.Client.IRIS.getBuffer(buffers, Carbon.Client.IRIS.unwrap(entry.layer)) instanceof Target target)\n                || target.imo$source() != owner || target.imo$type() != entry.layer) return false;\n        Submission draw = submission(target, entry.batch);\n",
+    "new": "    private boolean replayExternalDrop(BufferedDropPoses.Entry entry, MultiBufferSource buffers) {\n        if (!(Carbon.Client.IRIS.getBuffer(buffers, entry.layer) instanceof Target target)\n                || target.imo$source() != buffers || target.imo$type() != entry.layer) return false;\n        Submission draw = submission(target, entry.batch);\n",
+    "count": 1
+  },
+  {
+    "file": "java/first/carbon/client/ItemBatchRenderer.java",
+    "old": "        return true;\n    }\n\n    private MultiBufferSource poseOwner(MultiBufferSource buffers) {\n        Class<?> type = buffers.getClass();\n        if (type == MultiBufferSource.BufferSource.class) return buffers;\n        if (Carbon.Client.IRIS.active() || !Carbon.Client.IRIS.canInstance()) return null;\n        String name = type.getName();\n        return (name.equals(\"net.coderbot.batchedentityrendering.impl.FullyBufferedMultiBufferSource\")\n                || name.equals(\"net.irisshaders.batchedentityrendering.impl.FullyBufferedMultiBufferSource\"))\n                ? buffers : null;\n    }\n",
+    "new": "        return true;\n    }\n",
     "count": 1
   }
 ]

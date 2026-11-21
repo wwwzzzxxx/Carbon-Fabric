@@ -16,7 +16,9 @@ import java.util.*;
   int index=carbon$group++;while(carbon$owners.size()<=index)carbon$owners.add(new Object());Object owner=carbon$owners.get(index);
   if(!Carbon.CONFIG.enabled.get()||!RenderCompat.world)return submits;
   List<ItemFeatureRenderer.Submit> remaining=new ArrayList<>();
-  for(var submit:submits){boolean accepted=false;
+  for(var submit:submits){
+   if (Carbon.Client.DROPPED_RENDERER.isOutlineMarker(submit)) continue;
+   boolean accepted=false;
    if(submit.outlineColor()==0&&submit.foilType()!=ItemStackRenderState.FoilType.SPECIAL&&!submit.quads().isEmpty()&&!submit.hasTranslucency()){
     var type=submit.quads().get(0).materialInfo().itemRenderType();
     if(submit.quads().stream().allMatch(quad->quad.materialInfo().itemRenderType()==type)){

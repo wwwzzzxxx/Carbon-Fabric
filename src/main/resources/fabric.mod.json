@@ -9,7 +9,7 @@
   "icon": "assets/carbon/icon.png",
   "environment": "client",
   "entrypoints": { "client": ["first.carbon.Carbon"] },
-  "mixins": ["carbon.mixins.json"],
+  "mixins": ["carbon.mixins.json", "carbon.buffered-drops.mixins.json"],
   "accessWidener": "carbon.accesswidener",
   "depends": { "fabricloader": ">=0.16.5", "minecraft": "1.18.2", "java": ">=17", "fabric": "*" },
   "contact": { "sources": "https://github.com/wwwzzzxxx/Carbon-Fabric" }

@@ -3,7 +3,7 @@ package first.carbon.mixin;
 import com.mojang.blaze3d.systems.RenderSystem;
 import first.carbon.Carbon;
 import first.carbon.client.ItemBatchRenderer;
-import net.minecraft.client.Minecraft;
+import first.carbon.client.StaticItemRenderStates;
 import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -20,7 +20,7 @@ public abstract class ItemStackSceneMixin implements ItemBatchRenderer.Component
     @Override public void imo$track() { imo$tracked = true; }
     @Override public boolean imo$tracked() { return imo$tracked; }
     @Override public int imo$version() {
-        int tick = first.carbon.compat.RenderCompat.guiTick();
+        int tick = StaticItemRenderStates.clientTick();
         if (tick != imo$tick) {
             imo$tick = tick;
             int hash = ((ItemStack) (Object) this).getComponentsPatch().hashCode();

@@ -38,9 +38,13 @@ import static org.lwjgl.opengl.GL33.*;
 
 // Preserve native entity transforms and batch the resulting model submissions.
 public final class ItemBatchRenderer {
+    private final BufferedItemOutlines outlines = new BufferedItemOutlines();
+    private final BufferedDropPoses retainedDrops = first.carbon.compat.BufferedDropProvider.provider().isEmpty()
+            ? null : new BufferedDropPoses(this::replayExternalDrop, this::poseOwner);
     private final List<GpuItemBatch> meshes = new ArrayList<>();
     private final IdentityHashMap<ItemStack, Entry> stacks = new IdentityHashMap<>();
     private final IdentityHashMap<MultiBufferSource.BufferSource, Map<RenderType, IdentityHashMap<GpuItemBatch, Submission>>> sources = new IdentityHashMap<>();
+    private final Map<RenderType, Boolean> supportedTypes = new IdentityHashMap<>();
     final IdentityHashMap<TextureAtlasSprite, Boolean> opaqueSprites = new IdentityHashMap<>();
     private final LegacyState state = new LegacyState();
     private int frame, program;
@@ -54,6 +58,8 @@ public final class ItemBatchRenderer {
     private boolean spriteApiChecked;
 
     public void beginFrame() {
+        outlines.beginFrame();
+        if (retainedDrops != null) retainedDrops.beginFrame();
         renderingWorld = false;
         frame++;
         instances = drawCalls = cacheMisses = nativeFallbacks = 0;
@@ -120,11 +126,18 @@ public final class ItemBatchRenderer {
                 || glGetInteger(GL_CURRENT_PROGRAM) != 0) return false;
         Target first = vertices instanceof Target ? (Target) vertices : null;
         Target second = null;
+        BufferedItemOutlines.OutlineVertex mask = null;
         if (vertices instanceof VertexPair) {
             VertexPair pair = (VertexPair) vertices;
-            first = pair.imo$first() instanceof Target ? (Target) pair.imo$first() : null;
-            second = pair.imo$second() instanceof Target ? (Target) pair.imo$second() : null;
-            if (second == null) return false;
+            mask = BufferedItemOutlines.mask(pair);
+            if (mask != null) {
+                VertexConsumer body = mask == pair.imo$first() ? pair.imo$second() : pair.imo$first();
+                first = body instanceof Target ? (Target) body : null;
+            } else {
+                first = pair.imo$first() instanceof Target ? (Target) pair.imo$first() : null;
+                second = pair.imo$second() instanceof Target ? (Target) pair.imo$second() : null;
+                if (second == null) return false;
+            }
         }
         if (first == null || first.imo$source() == null || !supported(first.imo$type())
                 || second != null && (first.imo$source() != second.imo$source() || !supported(second.imo$type()))) return false;
@@ -149,9 +162,42 @@ public final class ItemBatchRenderer {
         Submission a = submission(first, entry.mesh);
         Submission b = second == null ? null : submission(second, entry.mesh);
         if (a == b || instanceBytes + a.growth() + (b == null ? 0 : b.growth()) > 67108864) return false;
+        if (mask != null && !outlines.prepare(mask, first)) return false;
         a.add(pose.last(), light, overlay, frame);
         if (b != null) b.add(pose.last(), light, overlay, frame);
+        if (mask != null) outlines.append(entry.mesh, a.data, (a.count - 1) * 128, mask.carbon$color());
+        if (retainedDrops != null) retainedDrops.capture(entry.mesh, model, first.imo$type(),
+                first.imo$source(), a.data, a.count, b == null);
         touchMesh(entry.mesh);
+        instances++;
+        return true;
+    }
+
+    public BufferedDropPoses bufferedDropPoses() {
+        return retainedDrops != null && retainedDrops.active() && renderingWorld && !capturing && !failed
+                && Carbon.CONFIG.enabled.get() && !Carbon.Client.IRIS.active() ? retainedDrops : null;
+    }
+
+    private MultiBufferSource poseOwner(MultiBufferSource buffers) {
+        Class<?> type = buffers.getClass();
+        if (type == MultiBufferSource.BufferSource.class) return buffers;
+        // IrisBufferedSourceMixin gives this source's vertices the same ownership
+        // when its render layers are flushed without a shader pack.
+        return Carbon.Client.IRIS.defersEntities()
+                && type.getName().equals("net.coderbot.batchedentityrendering.impl.FullyBufferedMultiBufferSource")
+                ? buffers : null;
+    }
+
+    private boolean replayExternalDrop(BufferedDropPoses.Entry entry, MultiBufferSource buffers) {
+        if (glGetInteger(GL_CURRENT_PROGRAM) != 0) return false;
+        VertexConsumer vertices = buffers.getBuffer(entry.layer);
+        if (!(vertices instanceof Target)) return false;
+        Target target = (Target) vertices;
+        if (target.imo$source() != buffers || target.imo$type() != entry.layer) return false;
+        Submission draw = submission(target, entry.batch);
+        if (instanceBytes + draw.growth() > 67108864) return false;
+        draw.addRetained(entry.data, frame);
+        touchMesh(entry.batch);
         instances++;
         return true;
     }
@@ -194,10 +240,15 @@ public final class ItemBatchRenderer {
 
     private boolean supported(RenderType type) {
         type = Carbon.Client.IRIS.unwrap(type);
-        return type == RenderType.entitySolid(TextureAtlas.LOCATION_BLOCKS) || type == RenderType.entityCutout(TextureAtlas.LOCATION_BLOCKS)
+        Boolean cached = supportedTypes.get(type);
+        if (cached != null) return cached;
+        boolean supported = type == RenderType.entitySolid(TextureAtlas.LOCATION_BLOCKS)
+                || type == RenderType.entityCutout(TextureAtlas.LOCATION_BLOCKS)
                 || type == RenderType.entityCutoutNoCull(TextureAtlas.LOCATION_BLOCKS) || type == RenderType.entityTranslucentCull(TextureAtlas.LOCATION_BLOCKS)
                 || type == RenderType.itemEntityTranslucentCull(TextureAtlas.LOCATION_BLOCKS)
                 || isGlint(type);
+        supportedTypes.put(type, supported);
+        return supported;
     }
 
     private boolean isGlint(RenderType type) {
@@ -205,7 +256,12 @@ public final class ItemBatchRenderer {
                 || type == RenderType.entityGlint() || type == RenderType.entityGlintDirect();
     }
 
+    public void beforeNativeOutline(VertexConsumer vertices) {
+        outlines.beforeNative(vertices);
+    }
+
     public void flush(MultiBufferSource.BufferSource owner, RenderType type) {
+        outlines.flush(owner, type);
         flush(owner, type, false);
     }
 
@@ -296,12 +352,15 @@ public final class ItemBatchRenderer {
         if (RenderSystem.isOnRenderThreadOrInit()) clear(); else RenderSystem.recordRenderCall(this::clear);
     }
     private void clear() {
+        outlines.clear();
+        if (retainedDrops != null) retainedDrops.clear();
         pickupSource = null;
         Carbon.Client.DROPPED_RENDERER.invalidate();
         for (Map<RenderType, IdentityHashMap<GpuItemBatch, Submission>> owner : sources.values())
             for (IdentityHashMap<GpuItemBatch, Submission> layer : owner.values()) for (Submission draw : layer.values()) draw.close();
         for (GpuItemBatch mesh : meshes) mesh.close();
         sources.clear(); meshes.clear(); stacks.clear(); opaqueSprites.clear();
+        supportedTypes.clear();
         cachedMeshBytes = instanceBytes = 0;
         if (program != 0) glDeleteProgram(program);
         program = 0; failed = false;
@@ -316,7 +375,7 @@ public final class ItemBatchRenderer {
         } catch (Exception exception) { if (result != 0) glDeleteProgram(result); throw exception; }
         finally { if (vertex != 0) glDeleteShader(vertex); if (fragment != 0) glDeleteShader(fragment); }
     }
-    private static int compile(int type, String name) throws Exception {
+    static int compile(int type, String name) throws Exception {
         int shader = glCreateShader(type);
         try (InputStream stream = ItemBatchRenderer.class.getResourceAsStream("/assets/carbon/shaders/" + name)) {
             if (stream == null) throw new IllegalStateException("Missing shader " + name);
@@ -327,7 +386,11 @@ public final class ItemBatchRenderer {
         } catch (Exception exception) { glDeleteShader(shader); throw exception; }
         return shader;
     }
-    public String statistics() { return String.format(Locale.ROOT, "%d model submissions, %d instanced draws, %d native fallbacks, %d new meshes, %d instance bytes/frame", instances, drawCalls, nativeFallbacks, cacheMisses, uploadedBytes); }
+    public String statistics() {
+        String stats = String.format(Locale.ROOT, "%d model submissions, %d instanced draws, %d native fallbacks, %d new meshes, %d instance bytes/frame", instances, drawCalls, nativeFallbacks, cacheMisses, uploadedBytes);
+        stats += outlines.statistics();
+        return retainedDrops == null ? stats : stats + ", " + retainedDrops.reuses() + " retained external poses";
+    }
     public interface Target { MultiBufferSource.BufferSource imo$source(); RenderType imo$type(); void imo$target(MultiBufferSource.BufferSource source, RenderType type); }
     public interface VertexPair { VertexConsumer imo$first(); VertexConsumer imo$second(); }
     private static final class Entry {
@@ -338,12 +401,22 @@ public final class ItemBatchRenderer {
         final GpuItemBatch mesh; ByteBuffer data; int capacity, buffer, count, lastFrame;
         Submission(GpuItemBatch mesh) { this.mesh = mesh; }
         long growth() { return count == capacity ? (long) (Math.max(64, capacity * 2) - capacity) * 128 : 0; }
-        void add(PoseStack.Pose pose, int light, int overlay, int frame) {
+        int reserve(int frame) {
             if (count == capacity) { instanceBytes += growth(); capacity = Math.max(64, capacity * 2); data = data == null ? MemoryUtil.memAlloc(capacity * 128) : MemoryUtil.memRealloc(data, capacity * 128); }
-            int offset = count++ * 128;
+            lastFrame = frame;
+            return count++ * 128;
+        }
+        void addRetained(byte[] packed, int frame) {
+            int offset = reserve(frame);
+            ByteBuffer target = data.duplicate();
+            target.position(offset);
+            target.put(packed);
+        }
+        void add(PoseStack.Pose pose, int light, int overlay, int frame) {
+            int offset = reserve(frame);
             pose.pose().store(RenderCompat.slice(data, offset, 64).asFloatBuffer());
             RenderCompat.store(pose.normal(), RenderCompat.slice(data, offset + 64, 36).asFloatBuffer());
-            data.putInt(offset + 100, light); data.putInt(offset + 104, overlay); lastFrame = frame;
+            data.putInt(offset + 100, light); data.putInt(offset + 104, overlay);
         }
         void close() { if (buffer != 0) glDeleteBuffers(buffer); if (data != null) MemoryUtil.memFree(data); instanceBytes -= (long) capacity * 128; buffer = capacity = 0; data = null; }
     }

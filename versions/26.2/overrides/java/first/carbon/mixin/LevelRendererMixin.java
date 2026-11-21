@@ -18,6 +18,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
         Carbon.Client.RENDERER.beginWorld(camera,new Matrix4f(view),cameraState.projectionMatrix);
         Carbon.Client.DROPPED_RENDERER.beginFrame(camera,new Matrix4f(view),cameraState.projectionMatrix,tracker.getGameTimeDeltaPartialTick(false));
     }
+    @Inject(method = "submitEntities", at = @At("HEAD"))
+    private void carbon$prepareItemOutlines(com.mojang.blaze3d.vertex.PoseStack pose,
+            net.minecraft.client.renderer.state.level.LevelRenderState state,
+            net.minecraft.client.renderer.SubmitNodeCollector collector, CallbackInfo ci) {
+        Carbon.Client.DROPPED_RENDERER.beginOutlineSubmission(state.shouldShowEntityOutlines, state.entityRenderStates);
+    }
+
     @Inject(method="render",at=@At("RETURN"))
     private void carbon$end(CallbackInfo ci) {Carbon.Client.DROPPED_RENDERER.flush();Carbon.Client.DROPPED_RENDERER.endFrame();Carbon.Client.RENDERER.endWorld();}
 }

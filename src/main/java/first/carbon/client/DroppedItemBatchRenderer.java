@@ -183,7 +183,8 @@ public final class DroppedItemBatchRenderer {
         boolean enabled = Carbon.Client.IRIS.canInstance() && Carbon.CONFIG.enabled.get() && Carbon.CONFIG.optimizeDroppedItems.get()
                 && !entityTransforms.requiresEntityTransforms();
         boolean physics = enabled && Carbon.CONFIG.physicalDroppedItems.get();
-        boolean nativeCulling = !Carbon.CONFIG.skipVisibilityChecks.get() || entityCulling.requiresNativeVisibility(minecraft);
+        boolean nativeCulling = !Carbon.CONFIG.skipVisibilityChecks.get() || entityCulling.requiresNativeVisibility(minecraft)
+                || (enabled && first.carbon.compat.EntityOutlineCompatibility.selectsDroppedItems());
         int drawLimit = enabled && !nativeCulling ? first.carbon.compat.TweakerooVisibility.itemDrawLimit() : -1;
         boolean tweakerooSelection = enabled && drawLimit < 0 && entityTransforms.requiresNativeVisibility();
         boolean nativeVisibility = enabled && (nativeCulling || tweakerooSelection);
@@ -362,7 +363,7 @@ public final class DroppedItemBatchRenderer {
         boolean submitted = false;
         boolean shadow = Carbon.Client.IRIS.shadowPass();
         if (active && !capturing && entity.level == level && level.getEntity(entity.getId()) == entity
-                && !entity.isCurrentlyGlowing() && (!shadow || physics)) {
+                && !Minecraft.getInstance().shouldEntityAppearGlowing(entity) && (!shadow || physics)) {
             if (entity.tickCount == 0) {
                 entity.xOld = entity.getX();
                 entity.yOld = entity.getY();

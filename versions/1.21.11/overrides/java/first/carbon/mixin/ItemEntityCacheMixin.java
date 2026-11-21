@@ -53,7 +53,7 @@ public abstract class ItemEntityCacheMixin extends Entity implements DroppedItem
             imo$renderVersion = version;
             imo$renderTick = tickCount;
             boolean fire = getRemainingFireTicks() > 0 || getSharedFlag(0);
-            imo$eligible = !hasCustomName() && !shouldShowName() && !(fire && displayFireAnimation()) && !isCurrentlyGlowing();
+            imo$eligible = !hasCustomName() && !shouldShowName() && !(fire && displayFireAnimation());
             imo$renderFire = fire && isOnFire();
         }
         return imo$eligible;

@@ -1,6 +1,6 @@
 plugins { id 'net.fabricmc.fabric-loom-remap' }
 
-version = '1.16.5.9-fabric.14'
+version = '1.16.5.9-fabric.19'
 group = 'first.carbon'
 base { archivesName = 'carbon' }
 repositories { mavenCentral() }
@@ -16,7 +16,31 @@ dependencies {
 def generated = layout.buildDirectory.dir('generated/sources/carbon')
 tasks.register('prepareVersionSources', Sync) {
     from('../../src/main/java') { include 'first/carbon/Carbon.java', 'first/carbon/compat/TweakerooVisibility.java' }
+    from('../../src/main/java') {
+        include 'first/carbon/client/BufferedDropPoses.java', 'first/carbon/compat/BufferedDropProvider.java', 'first/carbon/mixin/BufferedDrop*.java'
+        filter { String line -> line.replace('item.getXRot()', 'item.xRot').replace('item.getYRot()', 'item.yRot') }
+    }
+    from('../../src/main/java') {
+        include 'first/carbon/client/BufferedItemOutlines.java', 'first/carbon/mixin/BufferedOutline*Mixin.java'
+        exclude 'first/carbon/mixin/BufferedOutlineSourceMixin.java'
+        filter { String line ->
+            line.replace('import com.mojang.blaze3d.platform.GlStateManager;', '')
+                .replace('import com.mojang.blaze3d.systems.RenderSystem;', '')
+                .replace('import first.carbon.compat.RenderCompat;', '')
+                .replace('RenderCompat.floats(RenderSystem.getModelViewMatrix(), matrix)', 'readMatrix(GL_MODELVIEW_MATRIX, matrix)')
+                .replace('RenderCompat.floats(RenderSystem.getProjectionMatrix(), matrix)', 'readMatrix(GL_PROJECTION_MATRIX, matrix)')
+                .replace('glUniform4fv(colorUniform, RenderSystem.getShaderColor());', 'glUniform4f(colorUniform, 1, 1, 1, 1);')
+                .replace('Carbon.Client.IRIS.restoreProgram(previousProgram);', 'glUseProgram(previousProgram);')
+                .replace('int activeTexture = GlStateManager._getActiveTexture();', '')
+                .replace('GlStateManager._activeTexture(GL_TEXTURE0);', '')
+                .replace('GlStateManager._bindTexture(RenderSystem.getShaderTexture(0));', '')
+                .replace('GlStateManager._activeTexture(activeTexture);',
+                    '}\n\n    private static FloatBuffer readMatrix(int state, FloatBuffer matrix) {\n        glGetFloatv(state, matrix);\n        return matrix;')
+        }
+    }
     from('../../src/legacy/java')
+    from('../../src/outline/java')
+    from('../../src/outline/compat') { include 'EntityOutlineCompatibility.java'; into 'first/carbon/compat' }
     into generated
 }
 sourceSets.main.java.setSrcDirs([generated])
@@ -26,6 +50,7 @@ tasks.named('compileJava') { dependsOn 'prepareVersionSources' }
 tasks.named('sourcesJar') { dependsOn 'prepareVersionSources' }
 tasks.withType(JavaCompile).configureEach { options.release = 8; options.encoding = 'UTF-8' }
 tasks.withType(ProcessResources).configureEach {
+    from('../../src/main/resources') { include 'assets/carbon/shaders/buffered_outline.*' }
     filteringCharset = 'UTF-8'
     inputs.property 'version', project.version
     filesMatching('fabric.mod.json') { expand(version: project.version) }

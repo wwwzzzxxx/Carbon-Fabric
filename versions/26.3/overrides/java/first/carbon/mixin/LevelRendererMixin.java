@@ -22,4 +22,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
     }
     @Inject(method="render",at=@At("RETURN"))
     private void carbon$end(CallbackInfo ci) {Carbon.Client.DROPPED_RENDERER.flush();Carbon.Client.DROPPED_RENDERER.endFrame();Carbon.Client.RENDERER.endWorld();}
+
+    @Inject(method = "submitFeatures", at = @At("HEAD"))
+    private void carbon$prepareItemOutlines(CallbackInfo ci) {
+        Carbon.Client.DROPPED_RENDERER.beginOutlineSubmission(levelRenderState.shouldShowEntityOutlines,
+                levelRenderState.entityRenderStates);
+    }
 }

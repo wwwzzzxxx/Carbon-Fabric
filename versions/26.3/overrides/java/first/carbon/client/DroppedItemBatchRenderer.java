@@ -2,8 +2,10 @@ package first.carbon.client;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.renderpearl.api.commands.RenderPass;
 import first.carbon.Carbon;
 import first.carbon.client.ItemBatchRenderer.ComponentVersion;
+import first.carbon.compat.ItemEntityCompatibility;
 import first.carbon.compat.RenderCompat;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
@@ -11,6 +13,12 @@ import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.SubmitNodeStorage;
+import net.minecraft.client.renderer.entity.state.EntityRenderState;
+import net.minecraft.client.renderer.entity.state.ItemEntityRenderState;
+import net.minecraft.client.renderer.feature.ItemFeatureRenderer;
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.renderer.Lightmap;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
@@ -21,12 +29,15 @@ import first.carbon.compat.ItemGeometry;
 import net.minecraft.client.resources.model.cuboid.ItemTransform;
 import net.minecraft.client.resources.model.geometry.ItemQuads;
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
@@ -53,6 +64,7 @@ import static org.lwjgl.opengl.GL33.*;
 public final class DroppedItemBatchRenderer {
     private final Logger logger = LoggerFactory.getLogger("Carbon");
     private final Int2ObjectOpenHashMap<List<GpuDroppedItemBatch>> buckets = new Int2ObjectOpenHashMap<>();
+    private final Int2ObjectOpenHashMap<DroppedItemUniforms> uniforms = new Int2ObjectOpenHashMap<>();
     private final Set<ItemGeometry> rejected = Collections.newSetFromMap(new IdentityHashMap<>());
     final IdentityHashMap<TextureAtlasSprite, Boolean> opaqueSprites = new IdentityHashMap<>();
     private final Matrix4f view = new Matrix4f();
@@ -112,9 +124,22 @@ public final class DroppedItemBatchRenderer {
     private GpuDroppedInstanceProcessor processor;
     private GpuShadowBatch shadows;
     private final NativeItemShadows nativeItemShadows = new NativeItemShadows();
+    private final StaticItemDrawPacket drawPacket = new StaticItemDrawPacket();
     private final boolean nativeSubmission = StaticItemRenderStates.requiresNativeSubmission();
     private boolean retainedSubmission;
+    private static final boolean externalDropTransforms = ItemEntityCompatibility.hasExternalDropTransforms();
+    private final ExternalDropPoses externalPoses = new ExternalDropPoses();
     private int directSubmissions;
+    private int outlineColor;
+    private int outlineProgram;
+    private int preparedOutlineProgram;
+    private boolean outlineUnavailable;
+    private boolean outlineSubmitted;
+    private int outlineSubmissions;
+    private int outlineDrawCalls;
+    private final ItemFeatureRenderer.Submit outlineMarker = new ItemFeatureRenderer.Submit(
+            new PoseStack().last(), ItemDisplayContext.GROUND, 0, 0, -1, new int[0], List.of(),
+            ItemStackRenderState.FoilType.NONE);
     private int generation;
     private int frame;
     private boolean active;
@@ -138,7 +163,7 @@ public final class DroppedItemBatchRenderer {
         StaticItemRenderStates.begin(position, generation, !failed && Carbon.CONFIG.enabled.get()
                 && Carbon.CONFIG.optimizeDroppedItems.get() && Carbon.CONFIG.skipVisibilityChecks.get()
                 && !Carbon.CONFIG.physicalDroppedItems.get() && Carbon.Client.IRIS.canInstance()
-                && !Carbon.Client.IRIS.active() && !entityTransforms.requiresEntityTransforms());
+                && !Carbon.Client.IRIS.active() && (externalDropTransforms || !entityTransforms.requiresEntityTransforms()));
     }
 
     public void beginFrame(Camera camera, Matrix4f view, Matrix4f projection, float partialTick) {
@@ -148,8 +173,8 @@ public final class DroppedItemBatchRenderer {
             irisGeneration = Carbon.Client.IRIS.generation;
         }
         boolean enabled = Carbon.Client.IRIS.canInstance() && Carbon.CONFIG.enabled.get() && Carbon.CONFIG.optimizeDroppedItems.get()
-                && !entityTransforms.requiresEntityTransforms();
-        boolean physics = enabled && Carbon.CONFIG.physicalDroppedItems.get();
+                && (externalDropTransforms || !entityTransforms.requiresEntityTransforms());
+        boolean physics = enabled && !externalDropTransforms && Carbon.CONFIG.physicalDroppedItems.get();
         if (this.enabled != enabled || this.physics != physics) {
             clear();
             this.enabled = enabled;
@@ -227,8 +252,13 @@ public final class DroppedItemBatchRenderer {
         boolean skipVisibility = Carbon.CONFIG.skipVisibilityChecks.get();
         nativeItemShadows.begin();
         directSubmissions = 0;
-        retainedSubmission = active && skipVisibility && !nativeSubmission && !physics
+        outlineColor = 0;
+        outlineSubmitted = false;
+        outlineSubmissions = 0;
+        outlineDrawCalls = 0;
+        retainedSubmission = active && skipVisibility && !nativeSubmission && !externalDropTransforms && !physics
                 && !Carbon.Client.IRIS.active() && !Carbon.Client.IRIS.shadowPass();
+        externalPoses.beginFrame(skipVisibility && acceptsExternalPoses());
         boolean dedicated = !Carbon.Client.IRIS.shadowPass();
         if (!dedicated) {
             updating = false;
@@ -297,10 +327,15 @@ public final class DroppedItemBatchRenderer {
 
     public boolean submitEntity(ItemEntity entity, ItemStackRenderState itemState, float partialTick,
                                 int light, PoseStack pose, Object buffers) {
+        return !externalDropTransforms && submitEntity(entity, itemState, partialTick, light, pose, buffers, false);
+    }
+
+    private boolean submitEntity(ItemEntity entity, ItemStackRenderState itemState, float partialTick,
+                                 int light, PoseStack pose, Object buffers, boolean outlined) {
         boolean submitted = false;
         boolean shadow = Carbon.Client.IRIS.shadowPass();
         if (active && !capturing && entity.level() == level && level.getEntity(entity.getId()) == entity
-                && !entity.isCurrentlyGlowing() && (!shadow || physics)) {
+                && (outlined || !entity.isCurrentlyGlowing()) && (!shadow || physics)) {
             if (entity.tickCount == 0) {
                 entity.xOld = entity.getX();
                 entity.yOld = entity.getY();
@@ -310,32 +345,8 @@ public final class DroppedItemBatchRenderer {
             if (stack.isEmpty()) {
                 return false;
             }
-            var layer = RenderCompat.batchableLayer(itemState);
-            if (layer == null) return false;
-            int version = ((ComponentVersion) (Object) stack).imo$version();
+            GpuDroppedItemBatch batch = batchFor(entity, stack, itemState, outlined, true);
             EntityCache cached = ((EntityCacheAccess) entity).imo$cache();
-
-            if (cached.stack != stack || cached.version != version || cached.generation != generation
-                    || (cached.batch != null && cached.batch.closed)) {
-                cached.stack = stack;
-                cached.version = version;
-                cached.generation = generation;
-                cached.batch = null;
-                cached.motionTick = Long.MIN_VALUE;
-                cached.roll = 0;
-                cached.rate = 0;
-            }
-            GpuDroppedItemBatch batch = cached.batch;
-            // Model choices and tints can change without an ItemStack mutation.
-            if (batch == null || itemState.isAnimated() || cached.quads != layer.quads
-                    || cached.itemTransform != layer.itemTransform || cached.extents != layer.extents
-                    || !sameTints(batch.tintLayers, layer.tintLayers)) {
-                batch = find(stack, RenderCompat.resolveItem(itemState, layer));
-                cached.batch = batch;
-                cached.quads = layer.quads;
-                cached.itemTransform = layer.itemTransform;
-                cached.extents = layer.extents;
-            }
             if (batch != null && (shadow || !batch.flushed)) {
                 ((ComponentVersion) (Object) stack).imo$track();
                 int count = stack.getCount();
@@ -343,7 +354,7 @@ public final class DroppedItemBatchRenderer {
                 if (shadow || batch.count + copies <= 65536) {
                     boolean spread = true;
                     boolean bob = true;
-                    float ageOffset = entity.tickCount + partialTick - clock;
+                    float ageOffset = (entity.tickCount - ticks) + (partialTick - this.partialTick);
                     if (physics && cached.motionTick != level.getGameTime()) {
                         if (cached.motionTick != Long.MIN_VALUE) {
                             cached.roll = (cached.roll + cached.rate * Math.min(20, level.getGameTime() - cached.motionTick)) % (float) (Math.PI * 2);
@@ -398,9 +409,47 @@ public final class DroppedItemBatchRenderer {
         return submitted;
     }
 
-    public boolean submitRetained(net.minecraft.client.renderer.entity.state.ItemEntityRenderState state, PoseStack pose) {
-        if (!active || !retainedSubmission || state.nameTag != null || state.displayFireAnimation
-                || state.isInvisible || state.appearsGlowing()) return false;
+    public void beginOutlineSubmission(boolean showOutlines, List<EntityRenderState> states) {
+        if (!showOutlines || !retainedSubmission || outlineUnavailable
+                || Boolean.getBoolean("carbon.test.disableSharedItemOutline")
+                || Boolean.getBoolean("carbon.test.disableItemOutlineBatching")) return;
+        int color = 0;
+        int count = 0;
+        for (EntityRenderState state : states) {
+            if (state.outlineColor == 0) continue;
+            // The depthless outline target uses draw order when differently colored masks overlap.
+            if (!(state instanceof ItemEntityRenderState) || color != 0 && state.outlineColor != color) return;
+            color = state.outlineColor;
+            count++;
+        }
+        if (count >= 8 && prepareOutlineProgram()) outlineColor = color;
+    }
+
+    public boolean isOutlineMarker(ItemFeatureRenderer.Submit submit) {
+        return submit == outlineMarker;
+    }
+
+    public boolean replayItemPacket(List<EntityRenderState> states, PoseStack pose) {
+        boolean eligible = retainedSubmission && instances == 0
+                && (pose.last().pose().properties() & org.joml.Matrix4fc.PROPERTY_IDENTITY) != 0;
+        if (!drawPacket.begin(eligible, states, frame, ticks, StaticItemRenderStates.clientTick(),
+                camera, partialTick, nativeItemShadows)) return false;
+        instances = drawPacket.instances();
+        directSubmissions = states.size();
+        return true;
+    }
+
+    public void rememberItemPacket(List<EntityRenderState> states) {
+        drawPacket.remember(states, buckets.values(), nativeItemShadows, frame, ticks, StaticItemRenderStates.clientTick(),
+                camera, partialTick, instances, directSubmissions);
+    }
+
+    public boolean submitRetained(ItemEntityRenderState state, PoseStack pose, SubmitNodeCollector collector) {
+        if (!active || (!retainedSubmission && !externalPoses.canReuse()) || state.nameTag != null || state.displayFireAnimation
+                || state.isInvisible) return false;
+        boolean outlined = state.appearsGlowing();
+        if (outlined && (outlineColor != state.outlineColor || !(collector instanceof SubmitNodeStorage)
+                || (pose.last().pose().properties() & org.joml.Matrix4fc.PROPERTY_IDENTITY) == 0)) return false;
         var access = (first.carbon.compat.ItemStateAccess) state;
         ItemEntity item = access.carbon$entity();
         if (item == null) return false;
@@ -411,22 +460,40 @@ public final class DroppedItemBatchRenderer {
         if (drawShadow && (shadows == null || shadows.flushed || !shadows.vanillaTexture
                 || !nativeItemShadows.canAdd(state)
                 || (pose.last().pose().properties() & org.joml.Matrix4fc.PROPERTY_IDENTITY) == 0)) return false;
+        if (!retainedSubmission) {
+            if (outlined) return false;
+            var batch = externalPoses.reuse(cached.externalPose, entry, item, pose, collector);
+            if (batch == null) return false;
+            batch.lastFrame = frame;
+            if (drawShadow) nativeItemShadows.add(state);
+            instances++;
+            directSubmissions++;
+            return true;
+        }
         GpuDroppedItemBatch batch = cached.batch;
         int copies = net.minecraft.client.renderer.entity.state.ItemClusterRenderState.getRenderedAmount(entry.count());
-        if (batch != null && batch == cached.directBatch && cached.directModel == state.item
+        if (batch != null && (batch.outlineType != null) == outlined
+                && batch == cached.directBatch && cached.directModel == state.item
                 && cached.generation == generation && !batch.closed && !batch.flushed && batch.count + copies <= 65536) {
-            float ageOffset = item.tickCount + access.carbon$partial() - clock;
+            float ageOffset = (item.tickCount - ticks) + (access.carbon$partial() - partialTick);
             batch.addEntity((float) (state.x - originX), (float) (state.y - originY), (float) (state.z - originZ),
                     ageOffset, item.bobOffs, state.lightCoords, true, true, copies, cached.rate);
             batch.lastFrame = frame;
             instances += copies;
         } else {
-            if (!submitEntity(item, state.item, access.carbon$partial(), state.lightCoords, pose, null)) return false;
+            if (!submitEntity(item, state.item, access.carbon$partial(), state.lightCoords, pose, null, outlined)) return false;
             cached.directModel = state.item;
             cached.directBatch = cached.batch;
         }
         if (drawShadow) nativeItemShadows.add(state);
         directSubmissions++;
+        if (outlined) {
+            outlineSubmissions++;
+            if (!outlineSubmitted) {
+                ((SubmitNodeStorage) collector).order(0).outline.submit(outlineMarker);
+                outlineSubmitted = true;
+            }
+        }
         return true;
     }
 
@@ -446,16 +513,95 @@ public final class DroppedItemBatchRenderer {
         return true;
     }
 
-    private GpuDroppedItemBatch find(ItemStack stack, RenderCompat.ResolvedItem resolved) {
+    public ItemEntityRenderState captureExternalItem(ItemEntityRenderState state) {
+        return externalPoses.capture(state);
+    }
+
+    public boolean acceptsExternalPoses() {
+        return externalDropTransforms && active && !Carbon.Client.IRIS.active() && !Carbon.Client.IRIS.shadowPass();
+    }
+
+    public boolean submitExternalShadow(ItemEntityRenderState state, PoseStack pose) {
+        if (!acceptsExternalPoses() || shadows == null || shadows.flushed || !shadows.vanillaTexture
+                || !nativeItemShadows.canAdd(state) || !ExternalDropPoses.matchesShadowPosition(state, pose, camera)) {
+            return false;
+        }
+        nativeItemShadows.add(state);
+        return true;
+    }
+
+    public boolean submitExternalPose(ItemStackRenderState itemState, PoseStack pose, int light, int overlay, int outline) {
+        ItemEntity entity = externalPoses.owner(itemState, overlay, outline);
+        if (entity == null) return false;
+        ItemStack stack = entity.getItem();
+        if (stack.isEmpty()) return false;
+        EntityCache cache = ((EntityCacheAccess) entity).imo$cache();
+        boolean retained = cache.staticState != null && cache.staticState.state().item == itemState;
+        GpuDroppedItemBatch batch = cache.directBatch;
+        if (!retained || cache.directModel != itemState || batch == null || batch.closed || batch.entityBatch || batch.outlineType != null) {
+            batch = batchFor(entity, stack, itemState, false, false);
+            cache.directModel = retained ? itemState : null;
+            cache.directBatch = batch;
+        }
+        if (batch == null || batch.flushed || batch.count >= 65536) return false;
+
+        externalPoses.add(batch, pose, light, camera, originX, originY, originZ);
+        if (retained && externalPoses.canReuse()) {
+            cache.externalPose = externalPoses.retain(cache.externalPose, batch, cache.staticState, entity, light);
+        }
+        batch.lastFrame = frame;
+        ((ComponentVersion) (Object) stack).imo$track();
+        directSubmissions++;
+        instances++;
+        return true;
+    }
+
+    private GpuDroppedItemBatch batchFor(ItemEntity entity, ItemStack stack, ItemStackRenderState itemState,
+                                         boolean outlined, boolean entityBatch) {
+        var layer = RenderCompat.batchableLayer(itemState);
+        if (layer == null) return null;
+        int version = ((ComponentVersion) (Object) stack).imo$version();
+        EntityCache cached = ((EntityCacheAccess) entity).imo$cache();
+
+        if (cached.stack != stack || cached.version != version || cached.generation != generation
+                || (cached.batch != null && cached.batch.closed)) {
+            cached.stack = stack;
+            cached.version = version;
+            cached.generation = generation;
+            cached.batch = null;
+            cached.motionTick = Long.MIN_VALUE;
+            cached.roll = 0;
+            cached.rate = 0;
+        }
+        GpuDroppedItemBatch batch = cached.batch;
+        // Model choices and tints can change without an ItemStack mutation.
+        if (batch == null || batch.entityBatch != entityBatch || (batch.outlineType != null) != outlined
+                || itemState.isAnimated() || cached.quads != layer.quads
+                || cached.itemTransform != layer.itemTransform || cached.extents != layer.extents
+                || !sameTints(batch.tintLayers, layer.tintLayers)) {
+            batch = find(stack, RenderCompat.resolveItem(itemState, layer), outlined, entityBatch);
+            cached.batch = batch;
+            cached.quads = layer.quads;
+            cached.itemTransform = layer.itemTransform;
+            cached.extents = layer.extents;
+        }
+        return batch;
+    }
+
+    private GpuDroppedItemBatch find(ItemStack stack, RenderCompat.ResolvedItem resolved, boolean outlined, boolean entityBatch) {
         if (resolved == null || stack.is(Items.TRIDENT) || stack.is(Items.SPYGLASS)) return null;
         ItemGeometry model = resolved.model();
-        if (rejected.contains(model)) return null;
+        if (rejected.contains(model) || !entityBatch && resolved.type().hasBlending()) return null;
+        RenderType outlineType = outlined ? resolved.type().outline().orElse(null) : null;
+        if (outlined && (outlineType == null || outlineType.pipeline() != RenderPipelines.OUTLINE_CULL
+                && outlineType.pipeline() != RenderPipelines.OUTLINE_NO_CULL)) return null;
         int hash = 31 * (31 * stack.getItem().hashCode() + stack.getComponentsPatch().hashCode())
                 + java.util.Arrays.hashCode(resolved.tints());
+        hash = 31 * hash + (outlined ? 1 : 0) + (entityBatch ? 0 : 2);
         List<GpuDroppedItemBatch> bucket = buckets.get(hash);
         if (bucket != null) {
             for (GpuDroppedItemBatch candidate : bucket) {
-                if (candidate.model == model && candidate.baseType == resolved.type()
+                if (candidate.entityBatch == entityBatch && candidate.model == model && candidate.baseType == resolved.type() && candidate.outlineType == outlineType
                         && java.util.Arrays.equals(candidate.tintLayers, resolved.tints())
                         && ItemStack.isSameItemSameComponents(candidate.stack, stack)) return candidate;
             }
@@ -465,7 +611,7 @@ public final class DroppedItemBatchRenderer {
             return null;
         }
         try {
-            var batch = new GpuDroppedItemBatch(stack, resolved, this, true, false);
+            var batch = new GpuDroppedItemBatch(stack, resolved, this, entityBatch, false, outlineType);
             buckets.computeIfAbsent(hash, ignored -> new ArrayList<>()).add(batch);
             cacheMisses++;
             modelBytes += batch.meshBytes;
@@ -505,7 +651,9 @@ public final class DroppedItemBatchRenderer {
     }
 
     private void drawBatch(GpuDroppedItemBatch batch, FloatBuffer matrix) {
-        batch.processed = batch.entityBatch && processor != null;
+        // Small meshes can rotate in the existing vertex draw without a compute dispatch.
+        batch.processed = batch.entityBatch && processor != null && (batch.physics || batch.foil
+                || batch.meshes.size() != 1 || batch.meshes.get(0).indices > 64 * 6);
         int drawProgram = batch.entityBatch ? batch.processed ? preparedProgram : entityProgram : program;
         uploadedBytes += batch.upload();
         if (batch.processed && processor.prepare(batch, clock)) transformDispatches++;
@@ -524,37 +672,75 @@ public final class DroppedItemBatchRenderer {
         batch.flushed = true;
     }
 
-    private void bindBatchProgram(GpuDroppedItemBatch batch, int drawProgram, FloatBuffer matrix) {
-        glUseProgram(drawProgram);
-        glUniform1i(glGetUniformLocation(drawProgram, "GlintPass"), 0);
-        glUniformMatrix4fv(glGetUniformLocation(drawProgram, "TextureMat"), false,
-                RenderCompat.floats(RenderCompat.textureMatrix(), matrix));
-        glUniform1f(glGetUniformLocation(drawProgram, "GlintAlpha"), RenderCompat.glintAlpha());
-        glUniformMatrix4fv(glGetUniformLocation(drawProgram, "View"), false, view.get(matrix));
-        glUniformMatrix4fv(glGetUniformLocation(drawProgram, "Projection"), false, projection.get(matrix));
-        glUniform3f(glGetUniformLocation(drawProgram, "Camera"), (float) (camera.x - originX),
-                (float) (camera.y - originY), (float) (camera.z - originZ));
-        glUniform1f(glGetUniformLocation(drawProgram, "Clock"), clock);
-        glUniform1f(glGetUniformLocation(drawProgram, "GroundScaleY"), batch.groundScaleY);
-        if (batch.physics) {
-            glUniform3f(glGetUniformLocation(drawProgram, "Center"), batch.center.x, batch.center.y, batch.center.z);
-            glUniform3f(glGetUniformLocation(drawProgram, "HalfSize"), batch.halfSize.x, batch.halfSize.y, batch.halfSize.z);
-            glUniform1i(glGetUniformLocation(drawProgram, "Flat"), batch.flat ? 1 : 0);
+    public void drawOutlines(RenderPass pass) {
+        if (!outlineSubmitted) return;
+        int vao = glGetInteger(GL_VERTEX_ARRAY_BINDING);
+        int buffer = glGetInteger(GL_ARRAY_BUFFER_BINDING);
+        int previousProgram = glGetInteger(GL_CURRENT_PROGRAM);
+        RenderPass previousPass = RenderCompat.nativePass;
+        RenderCompat.nativePass = pass;
+        try (MemoryStack memory = MemoryStack.stackPush()) {
+            FloatBuffer matrix = memory.mallocFloat(16);
+            for (List<GpuDroppedItemBatch> bucket : buckets.values()) {
+                for (GpuDroppedItemBatch batch : bucket) {
+                    RenderType type = batch.outlineType;
+                    if (type == null || !batch.flushed || batch.count == 0) continue;
+                    int maskProgram = batch.processed ? preparedOutlineProgram : outlineProgram;
+                    RenderCompat.setupType(type);
+                    try {
+                        DroppedItemUniforms binding = bindBatchProgram(batch, maskProgram, matrix);
+                        glUniform4f(binding.outlineColor,
+                                ARGB.red(outlineColor) / 255f, ARGB.green(outlineColor) / 255f,
+                                ARGB.blue(outlineColor) / 255f, 1);
+                        for (GpuDroppedItemBatch.Mesh mesh : batch.meshes) {
+                            mesh.bind();
+                            glDrawElementsInstanced(GL_TRIANGLES, mesh.indices, GL_UNSIGNED_INT, 0, batch.count);
+                            outlineDrawCalls++;
+                        }
+                    } finally {
+                        RenderCompat.clearType(type);
+                    }
+                }
+            }
+        } finally {
+            RenderCompat.nativePass = previousPass;
+            glUseProgram(previousProgram);
+            glBindVertexArray(vao);
+            glBindBuffer(GL_ARRAY_BUFFER, buffer);
         }
-        for (int sampler = 0; sampler < 3; sampler++) {
-            glUniform1i(glGetUniformLocation(drawProgram, "Sampler" + sampler), sampler);
+    }
+
+    private DroppedItemUniforms bindBatchProgram(GpuDroppedItemBatch batch, int drawProgram, FloatBuffer matrix) {
+        glUseProgram(drawProgram);
+        DroppedItemUniforms binding = uniforms.computeIfAbsent(drawProgram, DroppedItemUniforms::new);
+        glUniform1i(binding.glintPass, 0);
+        glUniformMatrix4fv(binding.textureMatrix, false,
+                RenderCompat.floats(RenderCompat.textureMatrix(), matrix));
+        glUniform1f(binding.glintAlpha, RenderCompat.glintAlpha());
+        glUniformMatrix4fv(binding.view, false, view.get(matrix));
+        glUniformMatrix4fv(binding.projection, false, projection.get(matrix));
+        glUniform3f(binding.camera, (float) (camera.x - originX),
+                (float) (camera.y - originY), (float) (camera.z - originZ));
+        glUniform1f(binding.clock, clock);
+        glUniform1f(binding.groundScaleY, batch.groundScaleY);
+        if (batch.physics) {
+            glUniform3f(binding.center, batch.center.x, batch.center.y, batch.center.z);
+            glUniform3f(binding.halfSize, batch.halfSize.x, batch.halfSize.y, batch.halfSize.z);
+            glUniform1i(binding.flat, batch.flat ? 1 : 0);
         }
         float[] fog = RenderCompat.fogColor();
-        glUniform4f(glGetUniformLocation(drawProgram, "FogColor"), fog[0], fog[1], fog[2], fog[3]);
+        glUniform4f(binding.fogColor, fog[0], fog[1], fog[2], fog[3]);
         float[] color = RenderCompat.color();
-        glUniform4f(glGetUniformLocation(drawProgram, "ColorModulator"), color[0], color[1], color[2], color[3]);
-        glUniform1f(glGetUniformLocation(drawProgram, "FogStart"), RenderCompat.fogStart());
-        glUniform1f(glGetUniformLocation(drawProgram, "FogEnd"), RenderCompat.fogEnd());
-        glUniform1i(glGetUniformLocation(drawProgram, "FogShape"), RenderCompat.fogShape());
+        glUniform4f(binding.color, color[0], color[1], color[2], color[3]);
+        glUniform1f(binding.fogStart, RenderCompat.fogStart());
+        glUniform1f(binding.fogEnd, RenderCompat.fogEnd());
+        glUniform1i(binding.fogShape, RenderCompat.fogShape());
         RenderCompat.bindShared(drawProgram);
+        return binding;
     }
 
     public void endFrame() {
+        drawPacket.end(frame, instances);
         active = false;
         long allocated = 0;
         int count = 0;
@@ -584,11 +770,12 @@ public final class DroppedItemBatchRenderer {
     }
 
     public String statistics() {
-        return String.format(Locale.ROOT, "%d instances (%d collected), %d instanced draws, %d shadow instances/%d shadow draws, %d new meshes, %d instance bytes/frame, %d mesh bytes/frame, %d scene builds/%d reuses, %d transform dispatches, %d queued/%d updated, %.3f ms cache update, %d item state reuses, %d direct item submits, %d early state hits",
-                instances, collected, drawCalls, shadowInstances, shadowDrawCalls, cacheMisses, uploadedBytes, modelBytes, sceneBuilds, sceneReuses, transformDispatches, pendingUpdates, updatedEntities, cacheUpdateNs / 1_000_000.0, StaticItemRenderStates.reused(), directSubmissions, StaticItemRenderStates.earlyReuses());
+        return String.format(Locale.ROOT, "%d instances (%d collected), %d instanced draws, %d shadow instances/%d shadow draws, %d new meshes, %d instance bytes/frame, %d mesh bytes/frame, %d scene builds/%d reuses, %d transform dispatches, %d queued/%d updated, %.3f ms cache update, %d item state reuses, %d direct item submits, %d early state hits, %d shared outline submits/%d shared outline draws, %d retained external poses, %d retained item packets",
+                instances, collected, drawCalls, shadowInstances, shadowDrawCalls, cacheMisses, uploadedBytes, modelBytes, sceneBuilds, sceneReuses, transformDispatches, pendingUpdates, updatedEntities, cacheUpdateNs / 1_000_000.0, StaticItemRenderStates.reused(), directSubmissions, StaticItemRenderStates.earlyReuses(), outlineSubmissions, outlineDrawCalls, externalPoses.reuses(), drawPacket.replays);
     }
 
     public void invalidate() {
+        StaticItemRenderStates.clearVisibleItems();
         if (RenderSystem.isOnRenderThread()) {
             clear();
         } else {
@@ -601,6 +788,8 @@ public final class DroppedItemBatchRenderer {
     }
 
     private void clear() {
+        uniforms.clear();
+        drawPacket.clear();
         nativeItemShadows.clear();
         first.carbon.compat.ItemGeometry.clear();
         active = false;
@@ -653,7 +842,48 @@ public final class DroppedItemBatchRenderer {
             glDeleteProgram(preparedProgram);
             preparedProgram = 0;
         }
+        clearOutlinePrograms();
+        outlineUnavailable = false;
         failed = false;
+    }
+
+    private boolean prepareOutlineProgram() {
+        if (outlineProgram != 0) return true;
+        var resources = Minecraft.getInstance().getResourceManager();
+        if (resources.getResource(Identifier.withDefaultNamespace("shaders/core/rendertype_outline.vsh"))
+                .filter(resource -> OutlineShader.isBuiltin(resource.sourcePackId())).isEmpty()
+                || resources.getResource(Identifier.withDefaultNamespace("shaders/core/rendertype_outline.fsh"))
+                .filter(resource -> OutlineShader.isBuiltin(resource.sourcePackId())).isEmpty()) {
+            outlineUnavailable = true;
+            return false;
+        }
+        int fragment = 0;
+        try {
+            fragment = compile(GL_FRAGMENT_SHADER, "dropped_outline.fsh");
+            outlineProgram = createProgram("entity_instanced.vsh", fragment);
+            if (processor != null) preparedOutlineProgram = createProgram("entity_prepared.vsh", fragment);
+            return true;
+        } catch (IOException exception) {
+            clearOutlinePrograms();
+            outlineUnavailable = true;
+            logger.warn("Shared item outline shader unavailable", exception);
+            return false;
+        } finally {
+            if (fragment != 0) glDeleteShader(fragment);
+        }
+    }
+
+    private void clearOutlinePrograms() {
+        if (outlineProgram != 0) {
+            uniforms.remove(outlineProgram);
+            glDeleteProgram(outlineProgram);
+        }
+        if (preparedOutlineProgram != 0) {
+            uniforms.remove(preparedOutlineProgram);
+            glDeleteProgram(preparedOutlineProgram);
+        }
+        outlineProgram = 0;
+        preparedOutlineProgram = 0;
     }
 
     private int compile(int type, String name) throws IOException {
@@ -710,6 +940,7 @@ public final class DroppedItemBatchRenderer {
         StaticItemRenderStates.Entry staticState;
         private ItemStackRenderState directModel;
         private GpuDroppedItemBatch directBatch;
+        private RetainedExternalDropPose externalPose;
         private ItemStack stack;
         private GpuDroppedItemBatch batch;
         private int version;

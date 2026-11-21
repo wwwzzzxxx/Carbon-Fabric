@@ -4,6 +4,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import first.carbon.Carbon;
 import first.carbon.client.DroppedItemBatchRenderer;
 import first.carbon.client.ItemBatchRenderer;
+import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -48,10 +49,10 @@ public abstract class ItemEntityCacheMixin extends Entity implements DroppedItem
             imo$renderVersion = version;
             imo$renderTick = tickCount;
             boolean fire = getRemainingFireTicks() > 0 || getSharedFlag(0);
-            imo$eligible = !hasCustomName() && !shouldShowName() && !(fire && displayFireAnimation()) && !isCurrentlyGlowing();
+            imo$eligible = !hasCustomName() && !shouldShowName() && !(fire && displayFireAnimation());
             imo$renderFire = fire && isOnFire();
         }
-        return imo$eligible;
+        return imo$eligible && !Minecraft.getInstance().shouldEntityAppearGlowing(this);
     }
 
     @Override

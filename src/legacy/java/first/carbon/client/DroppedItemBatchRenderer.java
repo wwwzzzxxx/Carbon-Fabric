@@ -97,6 +97,7 @@ public final class DroppedItemBatchRenderer {
     private final OptiFineCompatibility optiFine = new OptiFineCompatibility();
     private final SodiumVisibility sodiumVisibility = new SodiumVisibility();
     private final boolean entityCulling = loader.isModLoaded("entityculling");
+    private final boolean itemPhysicLite = loader.isModLoaded("itemphysiclite");
     private final boolean tweakermore = loader.isModLoaded("tweakermore");
     private final Option precise = option("me.fallenbreath.tweakermore.config.TweakerMoreConfigs",
             "PRECISE_ITEM_ENTITY_MODEL", "getBooleanValue", tweakermore);
@@ -169,16 +170,16 @@ public final class DroppedItemBatchRenderer {
         shadowSelection.clear();
         pendingShadow = null;
         pendingShadowBuffer = null;
-        shadowCaptureOpen = true;
         uploadedBytes = 0;
         collectedThisFrame = false;
         frustum = null;
         if (!sceneReady) for (Group group : used) group.clearItems();
         used.clear();
-        active = !failed && Carbon.CONFIG.enabled.get() && Carbon.CONFIG.optimizeDroppedItems.get()
+        boolean compatible = !failed && Carbon.CONFIG.enabled.get() && Carbon.CONFIG.optimizeDroppedItems.get()
                 && !Carbon.CONFIG.physicalDroppedItems.get() && Carbon.Client.IRIS.canInstance()
                 && (!tweakermore || precise != null && !precise.bool(true))
                 && GL.getCapabilities().OpenGL33 && glGetInteger(GL_CURRENT_PROGRAM) == 0 && optiFine.canInstance();
+        active = compatible && !itemPhysicLite;
         if (active && program == 0) {
             try {
                 program = ItemBatchRenderer.createProgram("legacy_dropped.vsh");
@@ -191,7 +192,9 @@ public final class DroppedItemBatchRenderer {
         }
         EntityRenderDispatcher dispatcher = minecraft.getEntityRenderDispatcher();
         boolean drawShadows = minecraft.options.entityShadows && dispatcher.shouldRenderShadow;
-        if (active && drawShadows && !shadowFailed && shadows == null) {
+        // Lite owns item transforms and still submits ordinary entity shadows.
+        boolean batchShadows = drawShadows && (active || compatible && itemPhysicLite);
+        if (batchShadows && !shadowFailed && shadows == null) {
             try {
                 shadows = new LegacyDroppedShadows(ItemBatchRenderer.createProgram("legacy_shadow.vsh"), state);
             } catch (Exception exception) {
@@ -199,7 +202,9 @@ public final class DroppedItemBatchRenderer {
                 LogManager.getLogger("Carbon").warn("Dropped-item shadow instancing unavailable", exception);
             }
         }
+        shadowCaptureOpen = batchShadows && shadows != null;
         boolean cache = active && Carbon.CONFIG.skipVisibilityChecks.get() && !entityCulling
+                && !first.carbon.compat.EntityOutlineCompatibility.selectsDroppedItems()
                 && (!drawShadows || shadows != null) && !dispatcher.shouldRenderHitBoxes();
         boolean chooseVisibility = cache && !optiFine.present();
         int limit = chooseVisibility ? TweakerooVisibility.itemDrawLimit() : -1;
@@ -217,7 +222,7 @@ public final class DroppedItemBatchRenderer {
             nativeOriginTick = clientTick;
         }
         renderShadows = drawShadows;
-        boolean lightWork = active && minecraft.level.getChunkSource().getLightEngine().hasLightWork();
+        boolean lightWork = (active || shadowCaptureOpen) && minecraft.level.getChunkSource().getLightEngine().hasLightWork();
         lightDirty |= lightWork;
         if (renderShadows && shadows != null) {
             int skyDarken = minecraft.level.getSkyDarken();
@@ -230,7 +235,7 @@ public final class DroppedItemBatchRenderer {
         cameraEntity = camera.getEntity();
         detachedCamera = camera.isDetached();
         level = minecraft.level;
-        if (active) storeMatrices(pose, viewPose, viewNormal);
+        if (active || shadowCaptureOpen) storeMatrices(pose, viewPose, viewNormal);
         if ((frame & 63) == 0) trim();
     }
 
@@ -240,7 +245,7 @@ public final class DroppedItemBatchRenderer {
 
     public Iterable<Entity> collect(Iterable<Entity> original, MultiBufferSource buffers, PoseStack pose, Matrix4f projection, float partialTick) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (active) storeMatrices(pose, viewPose, viewNormal);
+        if (active || shadowCaptureOpen) storeMatrices(pose, viewPose, viewNormal);
         if (!cacheAllowed || optiFine.present() || frustum == null || minecraft.levelRenderer.capturedFrustum != null) return original;
         this.partialTick = shadowPartialTick = partialTick;
         double viewScale = Entity.getViewScale();
@@ -471,14 +476,25 @@ public final class DroppedItemBatchRenderer {
 
     public boolean captureShadow(Entity entity, MultiBufferSource buffers, float weight, float partialTick,
                                  LevelReader shadowLevel, float radius) {
-        if (!active || !shadowCaptureOpen || collectedThisFrame || entity != pendingShadow || buffers != pendingShadowBuffer
+        if (!shadowCaptureOpen || shadows == null
                 || shadowLevel != level || radius != 0.15F || partialTick != shadowPartialTick
                 || shadowSelection.size() == LegacyDroppedShadows.MAX_ITEMS || Carbon.Client.IRIS.active()) return false;
+        boolean submittedBody = !collectedThisFrame && entity == pendingShadow && buffers == pendingShadowBuffer;
+        if (!submittedBody) {
+            Minecraft minecraft = Minecraft.getInstance();
+            boolean worldBuffer = buffers == minecraft.renderBuffers().outlineBufferSource()
+                    || itemPhysicLite && buffers == minecraft.renderBuffers().bufferSource();
+            if (!worldBuffer || entity.getClass() != ItemEntity.class) return false;
+            EntityRenderer<?> renderer = minecraft.getEntityRenderDispatcher().getRenderer(entity);
+            if (renderer.getClass() != ItemEntityRenderer.class || renderer.shadowStrength != 0.75F) return false;
+        }
         float expected = (float) ((1.0 - camera.distanceToSqr(entity.position()) / 256.0) * 0.75F);
         if (weight != expected) return false;
-        shadowSelection.add(pendingShadow);
-        pendingShadow = null;
-        pendingShadowBuffer = null;
+        shadowSelection.add((ItemEntity) entity);
+        if (submittedBody) {
+            pendingShadow = null;
+            pendingShadowBuffer = null;
+        }
         return true;
     }
 
@@ -602,7 +618,7 @@ public final class DroppedItemBatchRenderer {
     }
 
     private static boolean eligible(ItemEntity item) {
-        return !item.hasCustomName() && !item.shouldShowName() && !item.isGlowing()
+        return !item.hasCustomName() && !item.shouldShowName() && !Minecraft.getInstance().shouldEntityAppearGlowing(item)
                 && !item.displayFireAnimation() && !item.isVehicle();
     }
 
@@ -690,6 +706,7 @@ public final class DroppedItemBatchRenderer {
     public void endWorld() {
         restoreOptiFineCounter();
         active = false;
+        shadowCaptureOpen = false;
     }
 
     public void flushShadows(MultiBufferSource.BufferSource buffers) {

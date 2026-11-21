@@ -5,6 +5,9 @@
   "plugin": "first.carbon.mixin.LegacyMixinPlugin",
   "compatibilityLevel": "JAVA_8",
   "client": [
+    "OutlineShaderMixin",
+    "BufferedOutlineBuilderMixin",
+    "BufferedOutlineGeneratorMixin",
     "ItemRendererMixin",
     "BufferBuilderMixin",
     "BufferSourceMixin",

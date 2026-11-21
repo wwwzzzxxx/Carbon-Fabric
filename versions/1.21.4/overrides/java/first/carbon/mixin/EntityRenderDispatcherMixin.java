@@ -31,7 +31,7 @@ public abstract class EntityRenderDispatcherMixin implements DroppedItemBatchRen
     @Inject(method = "render(Lnet/minecraft/world/entity/Entity;DDDFLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;I)V", at = @At("HEAD"), cancellable = true)
     private void imo$direct(Entity entity, double x, double y, double z, float partialTick, PoseStack pose, MultiBufferSource buffers, int light, CallbackInfo ci) {
         if (entity instanceof ItemEntity item && !Carbon.Client.IRIS.shadowPass() && !renderHitBoxes && !item.hasCustomName() && !item.shouldShowName()
-                && !item.displayFireAnimation() && !item.isCurrentlyGlowing()
+                && !item.displayFireAnimation() && !Minecraft.getInstance().shouldEntityAppearGlowing(item)
                 && ((EntityRenderDispatcher) (Object) this).getRenderer(item).getClass() == ItemEntityRenderer.class) {
             var renderer = Carbon.Client.DROPPED_RENDERER;
             if (renderer.submitEntity(item, partialTick, light, pose, buffers)) {

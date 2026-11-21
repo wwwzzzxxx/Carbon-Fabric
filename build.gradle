@@ -12,8 +12,12 @@ dependencies {
     implementation 'org.joml:joml:1.10.8'
     include 'org.joml:joml:1.10.8'
     modCompileOnly 'maven.modrinth:iris:1.6.11+1.18.2'
+    testImplementation platform('org.junit:junit-bom:5.11.0')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 tasks.withType(JavaCompile).configureEach { options.release = 17; options.encoding = 'UTF-8' }
+sourceSets.main.java.srcDirs('src/outline/java', 'src/outline/legacy', 'src/outline/compat')
 java { withSourcesJar(); sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
 tasks.withType(ProcessResources).configureEach {
     filteringCharset = 'UTF-8'
@@ -21,3 +25,12 @@ tasks.withType(ProcessResources).configureEach {
     filesMatching('fabric.mod.json') { expand(version: project.version) }
 }
 tasks.withType(Jar).configureEach { from 'LICENSE' }
+
+tasks.named('test', Test) { useJUnitPlatform() }
+
+tasks.register('checkOutlineMatrix', Exec) {
+    group = 'verification'
+    description = 'Verify generated outline support for every Minecraft target.'
+    commandLine 'python', '-B', '-X', 'utf8', '-m', 'unittest', 'discover', '-s', 'tests', '-p', 'test_outline_matrix.py'
+}
+tasks.named('check') { dependsOn 'checkOutlineMatrix' }

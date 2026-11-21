@@ -1,0 +1,8 @@
+{
+  "required": true,
+  "package": "first.carbon.mixin",
+  "compatibilityLevel": "JAVA_8",
+  "plugin": "first.carbon.mixin.BufferedDropMixinPlugin",
+  "client": ["BufferedDropDispatcherMixin", "BufferedDropEntityAccessor"],
+  "injectors": { "defaultRequire": 1 }
+}

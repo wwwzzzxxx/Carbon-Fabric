@@ -9,13 +9,15 @@ import java.util.List;
 // Keep native shadow geometry for the same ordered set of visible item states.
 final class NativeItemShadows {
     private final List<ItemEntityRenderState> visible = new ArrayList<>();
-    private final List<ItemEntityRenderState> retained = new ArrayList<>();
+    private List<ItemEntityRenderState> retained = List.of();
+    private Packet pending;
     private Vec3 retainedCamera;
     private int pieces;
     private int retainedCount = -1;
 
     void begin() {
         visible.clear();
+        pending = null;
         pieces = 0;
     }
 
@@ -24,33 +26,69 @@ final class NativeItemShadows {
     }
 
     void add(ItemEntityRenderState state) {
+        materialize();
         visible.add(state);
         pieces += state.shadowPieces.size();
     }
 
-    void prepare(GpuShadowBatch batch, Vec3 camera) {
-        if (!visible.isEmpty()) {
-            if (batch.count == 0 && retainedCount >= 0 && camera.equals(retainedCamera) && visible.equals(retained)) {
-                batch.count = retainedCount;
-            } else {
-                boolean keep = batch.count == 0;
-                retained.clear();
-                retainedCount = -1;
-                for (ItemEntityRenderState state : visible) batch.addExtracted(state, camera);
-                if (keep) {
-                    retained.addAll(visible);
-                    retainedCamera = camera;
-                    retainedCount = batch.count;
-                }
-            }
+    Packet packet() {
+        if (pending == null) {
+            pending = new Packet(List.copyOf(visible), pieces);
             visible.clear();
         }
+        return pending;
+    }
+
+    void replay(Packet packet) {
+        if (pending == null && visible.isEmpty()) {
+            pending = packet;
+        } else {
+            materialize();
+            visible.addAll(packet.states);
+        }
+        pieces += packet.pieces;
+    }
+
+    private void materialize() {
+        if (pending != null) {
+            visible.addAll(pending.states);
+            pending = null;
+        }
+    }
+
+    void prepare(GpuShadowBatch batch, Vec3 camera) {
+        List<ItemEntityRenderState> current = pending != null ? pending.states : visible;
+        if (current.isEmpty()) return;
+        boolean keep = batch.count == 0;
+        boolean reused = keep && retainedCount >= 0 && camera.equals(retainedCamera)
+                && (current == retained || current.equals(retained));
+        if (reused) {
+            batch.count = retainedCount;
+        } else {
+            for (ItemEntityRenderState state : current) batch.addExtracted(state, camera);
+        }
+        if (keep) {
+            if (pending != null) {
+                retained = current;
+            } else if (!reused) {
+                retained = List.copyOf(current);
+            }
+            retainedCamera = camera;
+            retainedCount = batch.count;
+        } else {
+            retained = List.of();
+            retainedCount = -1;
+        }
+        pending = null;
+        visible.clear();
     }
 
     void clear() {
         begin();
-        retained.clear();
+        retained = List.of();
         retainedCamera = null;
         retainedCount = -1;
     }
+
+    record Packet(List<ItemEntityRenderState> states, int pieces) {}
 }

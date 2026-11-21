@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "first.carbon.mixin",
+  "plugin": "first.carbon.mixin.ExternalDropMixinPlugin",
+  "client": [
+    "ExternalItemDispatcherMixin",
+    "ExternalItemPoseMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

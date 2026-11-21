@@ -18,6 +18,11 @@ public final class IrisCompatibility {
         if(present&&enabled!=null)try {boolean next=(boolean)enabled.invoke(api);if(next!=active){active=next;invalidate();}}catch(ReflectiveOperationException e){blocked=true;}
     }
     public boolean active(){return active;}
+    public boolean defersWorldBuffers(MultiBufferSource source) {
+        return present && !active && !blocked && (
+                source instanceof OutlineBufferSource
+                || source.getClass().getName().equals("net.irisshaders.batchedentityrendering.impl.FullyBufferedMultiBufferSource"));
+    }
     public boolean canInstance() {
         return (!present || !blocked && !active)
                 && com.mojang.blaze3d.systems.RenderSystem.getDevice() instanceof com.mojang.blaze3d.opengl.GlDevice;

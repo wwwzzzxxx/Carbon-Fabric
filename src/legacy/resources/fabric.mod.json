@@ -16,7 +16,8 @@
     ]
   },
   "mixins": [
-    "carbon.legacy.mixins.json"
+    "carbon.legacy.mixins.json",
+    "carbon.buffered-drops.mixins.json"
   ],
   "accessWidener": "carbon.legacy.accesswidener",
   "depends": {

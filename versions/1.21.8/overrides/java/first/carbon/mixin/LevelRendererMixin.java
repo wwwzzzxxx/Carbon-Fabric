@@ -58,7 +58,15 @@ public abstract class LevelRendererMixin {
 
     @ModifyVariable(method = "renderEntities", at = @At("HEAD"), argsOnly = true)
     private List<Entity> carbon$reuseStaticItems(List<Entity> visible) {
-        return Carbon.Client.DROPPED_RENDERER.reuseVisibleItems(visible);
+        var renderer = Carbon.Client.DROPPED_RENDERER;
+        var remaining = renderer.reuseVisibleItems(visible);
+        renderer.prepareOutlines(remaining);
+        return remaining;
+    }
+
+    @Inject(method = "renderEntities", at = @At("HEAD"))
+    private void carbon$beginEntityPass(CallbackInfo ci) {
+        Carbon.Client.RENDERER.beginEntityPass();
     }
 
     @Inject(method = "renderEntities", at = @At("RETURN"))
@@ -66,6 +74,8 @@ public abstract class LevelRendererMixin {
         var renderer = Carbon.Client.DROPPED_RENDERER;
         renderer.flush();
         renderer.finishVisibleItems();
+        Carbon.Client.RENDERER.endEntityPass();
+        renderer.drawOutlines();
         Carbon.Client.RENDERER.flushShadows();
     }
     @Inject(method="renderLevel",at=@At("RETURN"))
